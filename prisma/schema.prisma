@@ -30,6 +30,8 @@ model lst_User {
   password     String?   @db.VarChar(255)
   date_entry   DateTime? @default(now())
 
+  activities         ActivityTrail[]
+
   @@map("lst_User")
 }
 
@@ -178,6 +180,8 @@ model ActivityTrail {
   details    String?  @db.VarChar(500)
   ipAddress  String?  @db.VarChar(50)
   createdAt  DateTime @default(now())
+
+  user   lst_User @relation(fields: [userId], references: [UserID], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("ActivityTrail")
 }
