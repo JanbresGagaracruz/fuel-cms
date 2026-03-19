@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   const contract = await prisma.lst_FuelContracts.create({
     data: {
       ContractNo,
-      SupplierID: SupplierID ? parseInt(SupplierID) : null,
+      SupplierID: parseInt(body.SupplierID),
       Representative,
       EffectivityFrom: EffectivityFrom ? new Date(EffectivityFrom) : null,
       EffectivityTo: EffectivityTo ? new Date(EffectivityTo) : null,
