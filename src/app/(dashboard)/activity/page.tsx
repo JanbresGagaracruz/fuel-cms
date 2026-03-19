@@ -126,6 +126,7 @@ export default function ActivityPage() {
                     {a.details && (
                       <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">{a.details}</p>
                     )}
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">{`${a.user?.Firstname ?? ''} ${a.user?.Lastname ?? ''}`}</p>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">{formatRelative(a.createdAt)}</p>
                   </div>
                 ))}
