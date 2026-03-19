@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { signIn, getSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Fuel, Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react'
@@ -14,10 +14,17 @@ function landingPage(level: number): string {
 }
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading…</div>}>
+      <LoginContent />
+    </Suspense>
+  )
+}
+
+function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const rawCallback = searchParams.get('callbackUrl')
- 
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -42,13 +49,13 @@ export default function LoginPage() {
       const session = await getSession()
       const level   = (session?.user?.accessLevel as number) ?? 1
       const landing = landingPage(level)
- 
+
       // If there's a callbackUrl that isn't a dashboard-only page, honour it
       // (e.g. a direct link to /contracts/123 is fine for level 1)
       const dest = rawCallback && !rawCallback.startsWith('/dashboard')
         ? rawCallback
         : landing
- 
+
       router.push(dest)
     }else if (res?.error) {
       setError('Invalid username or password. Please try again.')
