@@ -5,7 +5,10 @@ generator client {
 
 datasource db {
   provider = "sqlserver"
+  url = env("DATABASE_URL")
 }
+
+
 
 model lst_User {
   UserID       Int       @id @default(autoincrement())
