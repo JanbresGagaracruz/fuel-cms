@@ -5,11 +5,11 @@ import { prisma } from '@/lib/prisma'
 import { logActivity, ACTIONS, MODULES } from '@/lib/activity'
 import { canUpdate, canDelete } from '@/lib/permissions'
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const id = parseInt(params.id)
+  const id = parseInt((await params).id)
   const contract = await prisma.lst_FuelContracts.findUnique({
     where: { FuelContractID: id },
     include: {
@@ -39,13 +39,13 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   return NextResponse.json(contract)
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!canUpdate(session.user.accessLevel ?? 1))
     return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 })
 
-  const id = parseInt(params.id)
+  const id = parseInt((await params).id)
   const body = await req.json()
 
   const updated = await prisma.lst_FuelContracts.update({
@@ -75,13 +75,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json(updated)
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!canDelete(session.user.accessLevel ?? 1))
     return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 })
 
-  const id = parseInt(params.id)
+  const id = parseInt((await params).id)
   const contract = await prisma.lst_FuelContracts.findUnique({ where: { FuelContractID: id } })
   if (!contract) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
