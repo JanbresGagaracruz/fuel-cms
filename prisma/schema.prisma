@@ -1,0 +1,180 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+}
+
+model lst_User {
+  UserID       Int       @id @default(autoincrement())
+  UsrNam       String    @db.VarChar(100)
+  Psswrd       String?   @db.VarChar(255)
+  DisplayName  String?   @db.VarChar(150)
+  DCE_No       String?   @db.VarChar(50)
+  Birthdate    DateTime? @db.Date
+  Firstname    String?   @db.VarChar(100)
+  Middlename   String?   @db.VarChar(100)
+  Lastname     String?   @db.VarChar(100)
+  NameInitial  String?   @db.VarChar(20)
+  Email        String?   @db.VarChar(200)
+  PositionName String?   @db.VarChar(150)
+  PlantID      Int?
+  dtEntered    DateTime? @default(now())
+  enable       Boolean?  @default(true)
+  access_level Int?      @default(1)
+  password     String?   @db.VarChar(255)
+  date_entry   DateTime? @default(now())
+
+  @@map("lst_User")
+}
+
+model lst_FuelContracts {
+  FuelContractID   Int       @id @default(autoincrement())
+  ContractNo       String    @db.VarChar(100)
+  SupplierID       Int
+  Representative   String?   @db.VarChar(200)
+  EffectivityFrom  DateTime? @db.Date
+  EffectivityTo    DateTime? @db.Date
+  DocumentName     String?   @db.VarChar(300)
+  ExpiredDate      DateTime? @db.Date
+  isActive         Boolean?  @default(true)
+  isMiniGrid       Boolean?  @default(false)
+  date_entry       DateTime? @default(now())
+
+  packages lst_FuelContractPackages[]
+  details  lst_FuelContractDetail[]
+  supplier          lst_Supplier @relation(fields: [SupplierID], references: [SupplierID], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("lst_FuelContracts")
+}
+
+model lst_FuelContractPackages {
+  FuelContractPackageId Int       @id @default(autoincrement())
+  PackageName           String    @db.VarChar(200)
+  FuelContractID        Int
+  CreatedAt             DateTime? @default(now())
+
+  contract lst_FuelContracts         @relation(fields: [FuelContractID], references: [FuelContractID], onDelete: NoAction, onUpdate: NoAction)
+  details  lst_FuelContractDetail[]
+
+  @@map("lst_FuelContractPackages")
+}
+
+model lst_FuelContractDetail {
+  FuelContractDetailID  Int       @id @default(autoincrement())
+  FuelContractID        Int
+  FunctionalGroup       String?   @db.VarChar(200)
+  LocationGroup         String?   @db.VarChar(200)
+  PlantID               Int?
+  PlantName             String?   @db.VarChar(200)
+  FuelTypeID            Int?
+  DeliveryDate          DateTime? @db.Date
+  VolumeOrdered         Decimal?  @db.Decimal(18, 4)
+  VolumeValidated       Decimal?  @db.Decimal(18, 4)
+  ContractPrice         Decimal?  @db.Decimal(18, 4)
+  InvoiceNo             String?   @db.VarChar(100)
+  FuelContractPackageId Int?
+  ContractType          String?   @db.VarChar(50)
+  date_entry            DateTime? @default(now())
+
+  contract lst_FuelContracts          @relation(fields: [FuelContractID], references: [FuelContractID], onDelete: NoAction, onUpdate: NoAction)
+  package  lst_FuelContractPackages?  @relation(fields: [FuelContractPackageId], references: [FuelContractPackageId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("lst_FuelContractDetail")
+}
+
+model lst_Supplier {
+  SupplierID   Int       @id @default(autoincrement())
+  SupplierName String?   @db.VarChar(200)
+  FullName     String?   @db.VarChar(300)
+  date_entry   DateTime? @default(now())
+  isActive     Boolean?  @default(true)
+
+  contracts         lst_FuelContracts[]
+
+  @@map("lst_Supplier")
+}
+
+model lst_FuelType {
+  FuelTypeID      Int       @id @default(autoincrement())
+  Type            String?   @db.VarChar(100)
+  Fuel            String?   @db.VarChar(100)
+  HeatingValue    Decimal?  @db.Decimal(18, 4)
+  factor          Decimal?  @db.Decimal(18, 4)
+  EffectivityDate DateTime? @db.Date
+  date_entry      DateTime? @default(now())
+
+  @@map("lst_FuelType")
+}
+
+model lst_Plant {
+  PlantID       Int       @id @default(autoincrement())
+  PlantName     String?   @db.VarChar(200)
+  CostCenterNo  String?   @db.VarChar(50)
+  ProvinceID    Int?
+  DivID         Int?
+  GridID        Int?
+  MiniGrid      Int?
+  Isolated      Boolean?
+  OperatingHr   Decimal?  @db.Decimal(18, 2)
+  ElecCoop      String?   @db.VarChar(100)
+  isSubStation  Boolean?
+  SubPlantID    Int?
+  isActive      Boolean?  @default(true)
+  DateCreated   DateTime? @db.Date
+  DateActive    DateTime? @db.Date
+  DateInactive  DateTime? @db.Date
+  date_entry    DateTime? @default(now())
+
+  @@map("lst_Plant")
+}
+
+model rpt_fcms {
+  ReportID              Int       @id @default(autoincrement())
+  FuelContractID        Int
+  FuelContractPackageId Int
+  ContractNo            String    @db.VarChar(100)
+  PackageName           String    @db.VarChar(200)
+  FuelContractDetailID  Int
+  RowNo                 Int?       // null = baseline (ORIGINAL/AMENDMENT)
+  ContractType          String?   @db.VarChar(50)
+  DeliveryDate          DateTime? @db.Date
+  EstPrice              Decimal?  @db.Decimal(18, 4)   // C
+  VolumeOrdered         Decimal?  @db.Decimal(18, 4)   // D
+  AmountPeso            Decimal?  @db.Decimal(18, 4)   // E = C×D
+  EVatOrdered           Decimal?  @db.Decimal(18, 4)   // F = E×12%
+  TotalOrdered          Decimal?  @db.Decimal(18, 4)   // G = E+F
+  VolumeValidated       Decimal?  @db.Decimal(18, 4)   // H
+  AdjAmount             Decimal?  @db.Decimal(18, 4)   // I = H×C
+  EVatValidated         Decimal?  @db.Decimal(18, 4)   // J = I×12%
+  TotalValidated        Decimal?  @db.Decimal(18, 4)   // K = I+J
+  CumulativeVolume      Decimal?  @db.Decimal(18, 4)   // L = ΣH
+  CumulativeAmount      Decimal?  @db.Decimal(18, 4)   // M = ΣK
+  RemainingBudget       Decimal?  @db.Decimal(18, 4)   // N
+  EquivalentVolume      Decimal?  @db.Decimal(18, 4)   // O
+  VolumeBalance         Decimal?  @db.Decimal(18, 4)
+  InvoiceNo             String?   @db.VarChar(100)
+  PlantName             String?   @db.VarChar(200)
+  FunctionalGroup       String?   @db.VarChar(200)
+  LocationGroup         String?   @db.VarChar(200)
+  GeneratedBy           Int?      // userId
+  GeneratedAt           DateTime  @default(now())
+
+  @@map("rpt_fcms")
+}
+
+model ActivityTrail {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  action     String   @db.VarChar(100)
+  module     String   @db.VarChar(100)
+  entityId   Int?
+  entityName String?  @db.VarChar(200)
+  details    String?  @db.VarChar(500)
+  ipAddress  String?  @db.VarChar(50)
+  createdAt  DateTime @default(now())
+
+  @@map("ActivityTrail")
+}
