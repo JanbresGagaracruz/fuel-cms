@@ -10,13 +10,15 @@ import { cn } from '@/lib/utils'
 import { useState } from 'react'
 
 const routeLabels: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/contracts': 'Fuel Contracts',
-  '/packages': 'Contract Packages',
-  '/details': 'Contract Details',
-  '/activity': 'Activity Log',
-  '/users': 'User Management',
-  '/settings': 'Settings',
+  '/dashboard':       'Dashboard',
+  '/contracts':       'Fuel Contracts',
+  '/packages':        'Contract Packages',
+  '/details':         'Contract Details',
+  '/activity':        'Activity Log',
+  '/users':           'User Management',
+  '/settings':        'Settings',
+  '/running-balance': 'Running Balance',
+  '/amendment-log':   'Amendment Log',
 }
 
 interface TopbarProps {

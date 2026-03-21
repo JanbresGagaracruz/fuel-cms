@@ -16,6 +16,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Fuel,
+  BarChart2,
+  ArrowLeftRight,
 } from 'lucide-react'
 import Image from 'next/image'
 
@@ -39,6 +41,20 @@ const navItems = [
     href: '/packages',
     icon: Package,
     description: 'Contract packages',
+    minLevel: 1,
+  },
+  {
+    label: 'Running Balance',
+    href: '/running-balance',
+    icon: BarChart2,
+    description: 'Package balance summary',
+    minLevel: 1,
+  },
+  {
+    label: 'Amendment Log',
+    href: '/amendment-log',
+    icon: ArrowLeftRight,
+    description: 'Amendment transfer history',
     minLevel: 1,
   },
   {
