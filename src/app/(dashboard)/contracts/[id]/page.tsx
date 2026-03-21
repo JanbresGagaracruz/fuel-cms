@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Package, ClipboardList, Plus, Edit2,
-  Trash2, ChevronDown, ChevronRight, AlertTriangle, FileBarChart2,
+  Trash2, ChevronDown, ChevronRight, AlertTriangle, FileBarChart2, Lock, CheckCircle,
 } from 'lucide-react'
 import {
   Badge, Modal, InputField, SelectField, ConfirmDialog, EmptyState, Skeleton,
@@ -14,7 +14,7 @@ import { useToast } from '@/components/ui/Toast'
 import {
   formatDate, formatCurrency, formatNumber, getExpiryStatus, getContractTypeColor,
 } from '@/lib/utils'
-import { generatePackageReport, generateReportRows } from '@/lib/reportGenerator'
+import { generatePackageReport, generateReportRows, generatePackageSummary } from '@/lib/reportGenerator'
 
 // ─── constants ───────────────────────────────────────────────────────────────
 
@@ -22,6 +22,7 @@ const CONTRACT_TYPES = [
   { label: 'Original',  value: 'ORIGINAL'  },
   { label: 'Amendment', value: 'AMENDMENT' },
   { label: 'Running',   value: 'RUNNING'   },
+  { label: 'Closing',   value: 'CLOSING'   },
   // { label: 'Renewal',   value: 'RENEWAL'   },
   // { label: 'Addendum',  value: 'ADDENDUM'  },
 ]
@@ -29,6 +30,7 @@ const CONTRACT_TYPES = [
 const defaultPkgForm    = { PackageName: '' }
 const defaultDetailForm = {
   ContractType: 'ORIGINAL', FuelContractPackageId: '',
+  amendSourcePackageId: '',   // UI-only — which package's balance to pull & zero (AMENDMENT only)
   PlantID: '', PlantName: '', FuelTypeID: '',
   FunctionalGroup: '', LocationGroup: '',
   InvoiceNo: '', DeliveryDate: '',
@@ -50,14 +52,75 @@ function FieldGroup({ label }: { label: string }) {
 
 // ─── DetailFormFields — OUTSIDE page to prevent remount on keystroke ──────────
 interface DetailFormFieldsProps {
-  form:      DetailForm
-  onChange:  (v: DetailForm) => void
-  packages:  any[]
-  fuelTypes: any[]
-  plants:    any[]
+  form:             DetailForm
+  onChange:         (v: DetailForm) => void
+  packages:         any[]
+  fuelTypes:        any[]
+  plants:           any[]
+  packageSummaries: any[]   // rpt_PackageSummary records for AMENDMENT auto-populate
 }
 
-function DetailFormFields({ form, onChange, packages, fuelTypes, plants }: DetailFormFieldsProps) {
+function DetailFormFields({ form, onChange, packages, fuelTypes, plants, packageSummaries }: DetailFormFieldsProps) {
+  const isAmendment = form.ContractType === 'AMENDMENT'
+  const isClosing = form.ContractType === 'CLOSING'
+
+  // Called when user picks the SOURCE package (Amend From) for an AMENDMENT row
+  const handleAmendSourceSelect = (srcPkgId: string) => {
+    if (!srcPkgId) {
+      onChange({ ...form, amendSourcePackageId: '', ContractPrice: '', VolumeOrdered: '' })
+      return
+    }
+    const summary = packageSummaries.find((s: any) => String(s.FuelContractPackageId) === srcPkgId)
+    if (summary) {
+      onChange({
+        ...form,
+        amendSourcePackageId: srcPkgId,
+        ContractPrice: summary.EndRunningBalance != null ? String(Number(summary.EndRunningBalance).toFixed(4)) : '',
+        VolumeOrdered: summary.EndVolumeBalance  != null ? String(Number(summary.EndVolumeBalance).toFixed(4))  : '',
+      })
+    } else {
+      // Package exists but no summary yet — still set source, just blank the price/volume
+      onChange({ ...form, amendSourcePackageId: srcPkgId, ContractPrice: '', VolumeOrdered: '' })
+    }
+  }
+
+  // CLOSING type — only show Est. Price + Volume Validated
+  if (isClosing) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+        <FieldGroup label="Classification" />
+        <SelectField
+          label="Contract Type *"
+          value={form.ContractType}
+          onChange={(v) => onChange({ ...form, ContractType: v })}
+          options={CONTRACT_TYPES}
+          required
+        />
+        <SelectField
+          label="Package"
+          value={form.FuelContractPackageId}
+          onChange={(v) => onChange({ ...form, FuelContractPackageId: v })}
+          options={[
+            { label: '— No Package —', value: '' },
+            ...packages
+              .filter((p: any) => !p.isCertified)
+              .map((p: any) => ({
+                label: p.PackageName,
+                value: String(p.FuelContractPackageId),
+              })),
+          ]}
+        />
+        <InputField label="Invoice No." value={form.InvoiceNo} onChange={(v) => onChange({ ...form, InvoiceNo: v })} placeholder="e.g. INV-2025-001" />
+        <div className="col-span-full p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-400">
+          <strong>Closing entry</strong> — only Estimated Price and Validated Volume are required.
+        </div>
+        <FieldGroup label="Closing Values" />
+        <InputField label="Est. Price / Closing Price (₱/L)" value={form.ContractPrice} onChange={(v) => onChange({ ...form, ContractPrice: v })} type="number" placeholder="0.0000" />
+        <InputField label="Volume Validated (L)" value={form.VolumeValidated} onChange={(v) => onChange({ ...form, VolumeValidated: v })} type="number" placeholder="0.00" />
+      </div>
+    )
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
 
@@ -67,22 +130,82 @@ function DetailFormFields({ form, onChange, packages, fuelTypes, plants }: Detai
       <SelectField
         label="Contract Type *"
         value={form.ContractType}
-        onChange={(v) => onChange({ ...form, ContractType: v })}
+        onChange={(v) => onChange({ ...form, ContractType: v, ContractPrice: '', VolumeOrdered: '', FuelContractPackageId: '', amendSourcePackageId: '' })}
         options={CONTRACT_TYPES}
         required
       />
+
+      {/* ── Destination Package — only uncertified packages ── */}
       <SelectField
-        label="Package"
+        label="Package (Destination)"
         value={form.FuelContractPackageId}
         onChange={(v) => onChange({ ...form, FuelContractPackageId: v })}
         options={[
           { label: '— No Package —', value: '' },
-          ...packages.map((p: any) => ({
-            label: p.PackageName,
-            value: String(p.FuelContractPackageId),
-          })),
+          ...packages
+            .filter((p: any) => !p.isCertified)
+            .map((p: any) => ({
+              label: p.PackageName,
+              value: String(p.FuelContractPackageId),
+            })),
         ]}
       />
+
+      {/* ── Amend From (source package — only shown for AMENDMENT) ── */}
+      {isAmendment && (
+        <div className="col-span-full space-y-1.5">
+          <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
+            Amend From (Source Package) <span className="text-brand-500">*</span>
+          </label>
+          <select
+            value={form.amendSourcePackageId}
+            onChange={(e) => handleAmendSourceSelect(e.target.value)}
+            className="input-field"
+          >
+            <option value="">— Select source package whose balance to amend —</option>
+            {packages.map((p: any) => {
+              const s = packageSummaries.find((x: any) => String(x.FuelContractPackageId) === String(p.FuelContractPackageId))
+              const balLabel = s
+                ? ` | Bal ₱${Number(s.EndRunningBalance).toLocaleString('en-PH', { minimumFractionDigits: 2 })} / ${Number(s.EndVolumeBalance).toLocaleString('en-PH', { minimumFractionDigits: 2 })} L`
+                : ' | (no saved summary)'
+              return (
+                <option key={p.FuelContractPackageId} value={String(p.FuelContractPackageId)}>
+                  {p.PackageName}{balLabel}
+                </option>
+              )
+            })}
+          </select>
+
+          {/* Info card — only when a source package is selected */}
+          {form.amendSourcePackageId && (() => {
+            const s = packageSummaries.find((x: any) => String(x.FuelContractPackageId) === form.amendSourcePackageId)
+            if (!s) {
+              return (
+                <p className="text-xs text-[var(--text-muted)] mt-1">
+                  No saved summary for this package. Generate its report first to auto-populate balances, or enter values manually.
+                </p>
+              )
+            }
+            return (
+              <div className="mt-1.5 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs space-y-1">
+                <p className="font-600 text-amber-700 dark:text-amber-400">
+                  Auto-populated from <span className="underline">{s.PackageName}</span> ending balance:
+                </p>
+                <p className="text-amber-600 dark:text-amber-500">
+                  Contract Price → <span className="font-mono font-600">₱{Number(s.EndRunningBalance).toLocaleString('en-PH', { minimumFractionDigits: 4 })}</span>
+                </p>
+                <p className="text-amber-600 dark:text-amber-500">
+                  Volume Ordered → <span className="font-mono font-600">{Number(s.EndVolumeBalance).toLocaleString('en-PH', { minimumFractionDigits: 4 })} L</span>
+                </p>
+                <p className="text-amber-700 dark:text-amber-400 font-600 pt-0.5 border-t border-amber-200 dark:border-amber-700">
+                  ⚠ Saving will reset <span className="underline">{s.PackageName}</span>'s running balance to 0.
+                </p>
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
       <InputField
         label="Invoice No."
         value={form.InvoiceNo}
@@ -154,24 +277,46 @@ function DetailFormFields({ form, onChange, packages, fuelTypes, plants }: Detai
         onChange={(v) => onChange({ ...form, DeliveryDate: v })}
         type="date"
       />
-      <InputField
-        label="Contract Price/Fuel Price (₱/L)"
-        value={form.ContractPrice}
-        onChange={(v) => onChange({ ...form, ContractPrice: v })}
-        type="number"
-        placeholder="0.0000"
-      />
+
+      {/* Contract Price — read-only when auto-populated via Amendment */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
+          Contract Price (₱/L)
+          {isAmendment && form.amendSourcePackageId && (
+            <span className="ml-2 text-amber-500 font-400 normal-case">(from source ending balance)</span>
+          )}
+        </label>
+        <input
+          type="number"
+          value={form.ContractPrice}
+          onChange={(e) => onChange({ ...form, ContractPrice: e.target.value })}
+          placeholder="0.0000"
+          readOnly={isAmendment && !!form.amendSourcePackageId}
+          className={`input-field ${isAmendment && form.amendSourcePackageId ? 'bg-amber-50 dark:bg-amber-950/20 cursor-not-allowed' : ''}`}
+        />
+      </div>
 
       {/* ── Group 4: Volume ── */}
       <FieldGroup label="Volume" />
 
-      <InputField
-        label="Volume Ordered (L)"
-        value={form.VolumeOrdered}
-        onChange={(v) => onChange({ ...form, VolumeOrdered: v })}
-        type="number"
-        placeholder="0.00"
-      />
+      {/* Volume Ordered — read-only when auto-populated via Amendment */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
+          Volume Ordered (L)
+          {isAmendment && form.amendSourcePackageId && (
+            <span className="ml-2 text-amber-500 font-400 normal-case">(from source ending balance)</span>
+          )}
+        </label>
+        <input
+          type="number"
+          value={form.VolumeOrdered}
+          onChange={(e) => onChange({ ...form, VolumeOrdered: e.target.value })}
+          placeholder="0.00"
+          readOnly={isAmendment && !!form.amendSourcePackageId}
+          className={`input-field ${isAmendment && form.amendSourcePackageId ? 'bg-amber-50 dark:bg-amber-950/20 cursor-not-allowed' : ''}`}
+        />
+      </div>
+
       <InputField
         label="Volume Validated (L)"
         value={form.VolumeValidated}
@@ -179,7 +324,6 @@ function DetailFormFields({ form, onChange, packages, fuelTypes, plants }: Detai
         type="number"
         placeholder="0.00"
       />
-      {/* Auto-filled plant name — editable fallback */}
       <InputField
         label="Plant Name (auto-filled)"
         value={form.PlantName}
@@ -189,7 +333,6 @@ function DetailFormFields({ form, onChange, packages, fuelTypes, plants }: Detai
     </div>
   )
 }
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ContractDetailPage() {
@@ -200,12 +343,15 @@ export default function ContractDetailPage() {
   const [contract,    setContract]    = useState<any>(null)
   const [loading,     setLoading]     = useState(true)
   const [expandedPkg, setExpandedPkg] = useState<number | null>(null)
-  const [savingReport, setSavingReport] = useState<number | null>(null) // packageId
+  const [savingReport,  setSavingReport]  = useState<number | null>(null) // packageId
+  const [certifyingPkg, setCertifyingPkg] = useState<number | null>(null)
+  const [certifyConfirmPkg, setCertifyConfirmPkg] = useState<any>(null)
 
   // Lookup data
-  const [fuelTypes, setFuelTypes] = useState<any[]>([])
-  const [plants,    setPlants]    = useState<any[]>([])
-  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [fuelTypes,        setFuelTypes]        = useState<any[]>([])
+  const [plants,           setPlants]           = useState<any[]>([])
+  const [suppliers,        setSuppliers]        = useState<any[]>([])
+  const [packageSummaries, setPackageSummaries] = useState<any[]>([])
 
   // Package modal
   const [pkgModal,  setPkgModal]  = useState(false)
@@ -248,6 +394,15 @@ export default function ContractDetailPage() {
       setSuppliers(Array.isArray(sp) ? sp : [])
     })
   }, [])
+
+  // Load package summaries for this contract (used by Amendment auto-populate)
+  const loadPackageSummaries = useCallback(async () => {
+    const res  = await fetch(`/api/package-summary?contractId=${id}`)
+    const data = await res.json()
+    setPackageSummaries(Array.isArray(data) ? data : [])
+  }, [id])
+
+  useEffect(() => { loadPackageSummaries() }, [loadPackageSummaries])
 
   // ── Load contract ─────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -297,13 +452,50 @@ export default function ContractDetailPage() {
   const handleAddDetail = async (e: React.FormEvent) => {
     e.preventDefault()
     setSavingDetail(true)
+
+    // amendSourcePackageId is UI-only — strip it before sending to the API
+    const { amendSourcePackageId, ...apiPayload } = detailForm
+
     const res = await fetch('/api/details', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...detailForm, FuelContractID: id }),
+      body: JSON.stringify({ ...apiPayload, FuelContractID: id }),
     })
     setSavingDetail(false)
     if (res.ok) {
+      // If AMENDMENT with a source package: zero out source balance + log the transfer
+      if (detailForm.ContractType === 'AMENDMENT' && amendSourcePackageId) {
+        // Find source and destination package names for the log
+        const srcPkg  = contract?.packages?.find((p: any) => String(p.FuelContractPackageId) === amendSourcePackageId)
+        const destPkg = contract?.packages?.find((p: any) => String(p.FuelContractPackageId) === detailForm.FuelContractPackageId)
+        const srcSummary = packageSummaries.find((s: any) => String(s.FuelContractPackageId) === amendSourcePackageId)
+
+        await Promise.all([
+          // Zero out the source package running balance
+          fetch(`/api/package-summary/${amendSourcePackageId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ EndRunningBalance: 0, EndVolumeBalance: 0 }),
+          }),
+          // Save amendment transfer log
+          fetch('/api/amendment-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              FuelContractID:         contract.FuelContractID,
+              ContractNo:             contract.ContractNo,
+              SourcePackageId:        amendSourcePackageId,
+              SourcePackageName:      srcPkg?.PackageName || `Package #${amendSourcePackageId}`,
+              DestinationPackageId:   detailForm.FuelContractPackageId,
+              DestinationPackageName: destPkg?.PackageName || `Package #${detailForm.FuelContractPackageId}`,
+              AmendedAmount:          srcSummary?.EndRunningBalance ?? null,
+              AmendedVolume:          srcSummary?.EndVolumeBalance  ?? null,
+              InvoiceNo:              detailForm.InvoiceNo || null,
+            }),
+          }),
+        ])
+        await loadPackageSummaries()  // refresh so the next Amendment reflects the reset
+      }
       success('Detail added', `${detailForm.ContractType} — ${detailForm.InvoiceNo || 'no invoice'}`)
       setDetailModal(false)
       setDetailForm(defaultDetailForm)
@@ -318,6 +510,7 @@ export default function ContractDetailPage() {
     setEditDetailForm({
       ContractType:          d.ContractType          || 'ORIGINAL',
       FuelContractPackageId: d.FuelContractPackageId != null ? String(d.FuelContractPackageId) : '',
+      amendSourcePackageId:  '',
       PlantID:               d.PlantID    != null    ? String(d.PlantID)    : '',
       PlantName:             d.PlantName             || '',
       FuelTypeID:            d.FuelTypeID != null    ? String(d.FuelTypeID) : '',
@@ -398,6 +591,29 @@ export default function ContractDetailPage() {
     }
   }
 
+  const handleCertifyPackage = (pkg: any) => {
+    setCertifyConfirmPkg(pkg)
+  }
+
+  const handleCertifyConfirm = async () => {
+    const pkg = certifyConfirmPkg
+    if (!pkg) return
+    setCertifyConfirmPkg(null)
+    setCertifyingPkg(pkg.FuelContractPackageId)
+    const res = await fetch(`/api/packages/${pkg.FuelContractPackageId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isCertified: true }),
+    })
+    setCertifyingPkg(null)
+    if (res.ok) {
+      success('Package certified', `${pkg.PackageName} is now locked.`)
+      load()
+    } else {
+      toastError('Failed to certify package')
+    }
+  }
+
   const handleGenerateReport = async (pkg: any) => {
     const contractArg = {
       ContractNo:      contract.ContractNo,
@@ -422,20 +638,43 @@ export default function ContractDetailPage() {
     const win  = window.open(url, '_blank')
     if (win) win.addEventListener('load', () => URL.revokeObjectURL(url), { once: true })
 
-    // Save rows to rpt_fcms
+    // Save rows to rpt_fcms (always) + package summary (only if certified)
     setSavingReport(pkg.FuelContractPackageId)
     try {
       const rows = generateReportRows(contractArg, pkgArg)
-      const res  = await fetch('/api/reports', {
+      const rowsRes = await fetch('/api/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows }),
       })
-      if (res.ok) {
-        const data = await res.json()
-        success('Report saved', `${data.saved} rows recorded to rpt_fcms`)
+
+      if (!rowsRes.ok) {
+        toastError('Report opened but failed to save rows to database')
+        return
+      }
+      const rowsData = await rowsRes.json()
+
+      // Only save package summary when the package is certified
+      if (pkg.isCertified) {
+        const summary = generatePackageSummary(contractArg, pkgArg)
+        const summaryRes = await fetch('/api/package-summary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ summary }),
+        })
+        if (summaryRes.ok) {
+          const summaryData = await summaryRes.json()
+          if (summaryData.skipped) {
+            success('Report saved', `${rowsData.saved} rows recorded — summary preserved (already certified)`)
+          } else {
+            success('Report saved', `${rowsData.saved} rows + certified summary recorded`)
+            await loadPackageSummaries()
+          }
+        } else {
+          success('Report saved', `${rowsData.saved} rows recorded (summary save failed)`)
+        }
       } else {
-        toastError('Report opened but failed to save to database')
+        success('Report saved', `${rowsData.saved} rows recorded — certify package to save summary`)
       }
     } catch {
       toastError('Report opened but save failed')
@@ -626,16 +865,34 @@ export default function ContractDetailPage() {
                     }
                   </button>
 
-                  {/* Generate Report button */}
-                  <button
-                    onClick={() => handleGenerateReport(pkg)}
-                    disabled={savingReport === pkg.FuelContractPackageId}
-                    className="flex items-center gap-1.5 mx-3 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white text-xs font-500 transition-all whitespace-nowrap flex-shrink-0 shadow-sm disabled:opacity-60 disabled:cursor-wait"
-                    title="Generate report and save to rpt_fcms"
-                  >
-                    <FileBarChart2 size={13} />
-                    {savingReport === pkg.FuelContractPackageId ? 'Saving…' : 'Generate Report'}
-                  </button>
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2 mx-3 flex-shrink-0">
+                    {/* Certify button — only shown when not yet certified */}
+                    {!pkg.isCertified ? (
+                      <button
+                        onClick={() => handleCertifyPackage(pkg)}
+                        disabled={certifyingPkg === pkg.FuelContractPackageId}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-500 transition-all whitespace-nowrap shadow-sm disabled:opacity-60 disabled:cursor-wait"
+                        title="Certify this package — locks all details"
+                      >
+                        <Lock size={13} />
+                        {certifyingPkg === pkg.FuelContractPackageId ? 'Certifying…' : 'Certify'}
+                      </button>
+                    ) : (
+                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-600 whitespace-nowrap border border-green-200 dark:border-green-800">
+                        <CheckCircle size={13} /> Certified
+                      </span>
+                    )}
+                    <button
+                      onClick={() => handleGenerateReport(pkg)}
+                      disabled={savingReport === pkg.FuelContractPackageId}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white text-xs font-500 transition-all whitespace-nowrap shadow-sm disabled:opacity-60 disabled:cursor-wait"
+                      title={pkg.isCertified ? "Generate report + save certified summary" : "Generate report (certify to save summary)"}
+                    >
+                      <FileBarChart2 size={13} />
+                      {savingReport === pkg.FuelContractPackageId ? 'Saving…' : 'Generate Report'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Expanded details */}
@@ -653,15 +910,17 @@ export default function ContractDetailPage() {
                         >
                           <FileBarChart2 size={12} /> Generate Report
                         </button>
-                        <button
-                          onClick={() => {
-                            setDetailForm({ ...defaultDetailForm, FuelContractPackageId: String(pkg.FuelContractPackageId) })
-                            setDetailModal(true)
-                          }}
-                          className="text-xs text-brand-500 hover:text-brand-400 transition-colors flex items-center gap-1"
-                        >
-                          <Plus size={12} /> Add Detail
-                        </button>
+                        {!pkg.isCertified && (
+                          <button
+                            onClick={() => {
+                              setDetailForm({ ...defaultDetailForm, FuelContractPackageId: String(pkg.FuelContractPackageId) })
+                              setDetailModal(true)
+                            }}
+                            className="text-xs text-brand-500 hover:text-brand-400 transition-colors flex items-center gap-1"
+                          >
+                            <Plus size={12} /> Add Detail
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -710,6 +969,12 @@ export default function ContractDetailPage() {
                                 <td className="text-xs text-[var(--text-secondary)]">{d.InvoiceNo || '—'}</td>
                                 <td>
                                   <div className="flex items-center gap-1">
+                                    {pkg.isCertified ? (
+                                      <span className="text-xs text-[var(--text-muted)] px-1.5 flex items-center gap-1">
+                                        <Lock size={11} /> Locked
+                                      </span>
+                                    ) : (
+                                      <>
                                     <button
                                       onClick={() => openEditDetail(d)}
                                       className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-brand-500 transition-colors"
@@ -724,6 +989,8 @@ export default function ContractDetailPage() {
                                     >
                                       <Trash2 size={13} />
                                     </button>
+                                      </>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -758,7 +1025,7 @@ export default function ContractDetailPage() {
       {/* Add Detail */}
       <Modal open={detailModal} onClose={() => setDetailModal(false)} title="Add Contract Detail" size="xl">
         <form onSubmit={handleAddDetail} className="space-y-2">
-          <DetailFormFields form={detailForm} onChange={setDetailForm} packages={contract?.packages || []} fuelTypes={fuelTypes} plants={plants} />
+          <DetailFormFields form={detailForm} onChange={setDetailForm} packages={contract?.packages || []} fuelTypes={fuelTypes} plants={plants} packageSummaries={packageSummaries} />
           <div className="flex justify-end gap-2 pt-4">
             <button type="button" className="btn-secondary" onClick={() => setDetailModal(false)}>Cancel</button>
             <button type="submit" className="btn-primary" disabled={savingDetail}>
@@ -786,7 +1053,7 @@ export default function ContractDetailPage() {
               <span className="text-xs text-[var(--text-muted)]">· {editDetailForm.PlantName}</span>
             )}
           </div>
-          <DetailFormFields form={editDetailForm} onChange={setEditDetailForm} packages={contract?.packages || []} fuelTypes={fuelTypes} plants={plants} />
+          <DetailFormFields form={editDetailForm} onChange={setEditDetailForm} packages={contract?.packages || []} fuelTypes={fuelTypes} plants={plants} packageSummaries={packageSummaries} />
           <div className="flex justify-end gap-2 pt-4">
             <button type="button" className="btn-secondary" onClick={() => setEditDetailModal(false)}>Cancel</button>
             <button type="submit" className="btn-primary" disabled={savingEditDetail}>
@@ -805,6 +1072,16 @@ export default function ContractDetailPage() {
         description={`Are you sure you want to delete "${deleteDetailName}"? This cannot be undone.`}
         confirmLabel="Delete Detail"
         danger
+      />
+
+      {/* Certify Package confirm */}
+      <ConfirmDialog
+        open={!!certifyConfirmPkg}
+        onClose={() => setCertifyConfirmPkg(null)}
+        onConfirm={handleCertifyConfirm}
+        title={`Certify Package — ${certifyConfirmPkg?.PackageName ?? ''}`}
+        description={`Certifying this package will:\n\n• Lock all existing details (no edits or deletions)\n• Prevent any new details from being added\n• Save the running balance summary on the next report generation\n\nThis action cannot be undone. Are you sure you want to certify "${certifyConfirmPkg?.PackageName ?? ''}"?`}
+        confirmLabel="Certify Package"
       />
 
       {/* Edit Contract */}

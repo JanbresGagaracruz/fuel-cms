@@ -42,5 +42,7 @@ export const config = {
     '/activity/:path*',
     '/users/:path*',
     '/settings/:path*',
+    '/running-balance/:path*',
+    '/amendment-log/:path*',
   ],
 }

@@ -32,6 +32,56 @@ export interface ReportContract {
   isMiniGrid?:     boolean
 }
 
+// Shape saved to rpt_PackageSummary
+export interface PackageSummary {
+  FuelContractID:        number
+  FuelContractPackageId: number
+  ContractNo:            string
+  PackageName:           string
+  BegRunningBalance:     number   // totalContractedAmount — budget before any delivery
+  EndRunningBalance:     number   // remaining budget after last RUNNING row
+  BegVolumeBalance:      number   // totalContractedVolume
+  EndVolumeBalance:      number   // remaining volume after last RUNNING row
+  TotalVolumeOrdered:    number   // sum of D from RUNNING rows
+  TotalVolumeValidated:  number   // sum of H from RUNNING rows
+  TotalAmountOrdered:    number   // sum of G from RUNNING rows (incl. VAT)
+  TotalAmountValidated:  number   // sum of K from RUNNING rows (incl. VAT)
+  RunningRowCount:       number
+}
+
+/** Derives the beg/end running balance and beg/end volume balance for a package. */
+export function generatePackageSummary(
+  contract: ReportContract,
+  pkg:      ReportPackage,
+): PackageSummary {
+  const { rows, totalContractedAmount, totalContractedVolume, cumVolume, cumAmount } =
+    _buildRows(contract, pkg)
+
+  const runningRows = rows.filter((r: any) => !r.isBaseline && !r.isSummary)
+
+  // End values come from the last RUNNING row's remaining balance fields
+  const lastRunning = runningRows[runningRows.length - 1]
+
+  return {
+    FuelContractID:        contract.FuelContractID ?? 0,
+    FuelContractPackageId: pkg.FuelContractPackageId,
+    ContractNo:            contract.ContractNo,
+    PackageName:           pkg.PackageName,
+    // Amount balance
+    BegRunningBalance:     totalContractedAmount,
+    EndRunningBalance:     lastRunning ? (lastRunning.N ?? (totalContractedAmount - cumAmount)) : totalContractedAmount,
+    // Volume balance
+    BegVolumeBalance:      totalContractedVolume,
+    EndVolumeBalance:      lastRunning ? lastRunning.volumeBalance : totalContractedVolume,
+    // Running totals
+    TotalVolumeOrdered:    runningRows.reduce((s: number, r: any) => s + (r.D ?? 0), 0),
+    TotalVolumeValidated:  runningRows.reduce((s: number, r: any) => s + (r.H ?? 0), 0),
+    TotalAmountOrdered:    runningRows.reduce((s: number, r: any) => s + (r.G ?? 0), 0),
+    TotalAmountValidated:  runningRows.reduce((s: number, r: any) => s + (r.K ?? 0), 0),
+    RunningRowCount:       runningRows.length,
+  }
+}
+
 // Shape saved to rpt_fcms
 export interface ReportRow {
   FuelContractID:        number
@@ -85,6 +135,7 @@ const TYPE_ORDER: Record<string, number> = {
   RUNNING:   2,
   RENEWAL:   3,
   ADDENDUM:  4,
+  CLOSING:   5,
 }
 
 // ─── internal shared row builder (your corrected version) ────────────────────
@@ -305,8 +356,12 @@ export function generatePackageReport(
 
   function typeRowClass(t: string): string {
     const map: Record<string, string> = {
-      ORIGINAL: 'row-original', AMENDMENT: 'row-amendment',
-      RUNNING:  'row-running',  RENEWAL:   'row-renewal', ADDENDUM: 'row-addendum',
+      ORIGINAL:  'row-original',
+      AMENDMENT: 'row-amendment',
+      RUNNING:   'row-running',
+      RENEWAL:   'row-renewal',
+      ADDENDUM:  'row-addendum',
+      CLOSING:   'row-closing',
     }
     return map[t] ?? ''
   }
@@ -398,6 +453,7 @@ export function generatePackageReport(
   .row-running   td { background: #ffffff; }
   .row-renewal   td { background: #dcfce7; }
   .row-addendum  td { background: #f3e8ff; }
+  .row-closing   td { background: #fee2e2; color: #991b1b; font-weight: bold; }
   .summary-row   td { background: #f0fdf4; font-weight: bold; }
   .highlight-yellow { background: #fff200 !important; font-weight: bold; color: red; }
   .right  { text-align: right;  }
@@ -422,6 +478,7 @@ export function generatePackageReport(
     .no-print { display: none !important; }
     .row-original  td { background: #dbeafe !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .row-amendment td { background: #fef9c3 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .row-closing   td { background: #fee2e2 !important; color: #991b1b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .summary-row   td { background: #f0fdf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .highlight-yellow { background: #fff200 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .mini-grid-badge  { background: #cffafe !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -447,6 +504,7 @@ export function generatePackageReport(
   <div class="legend-item"><div class="legend-swatch" style="background:#fef9c3"></div> AMENDMENT</div>
   <div class="legend-item"><div class="legend-swatch" style="background:#f0fdf4;border-color:#86efac"></div> BALANCE AFTER AO</div>
   <div class="legend-item"><div class="legend-swatch" style="background:#fff;border-color:#888"></div> RUNNING</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#fee2e2;border-color:#f87171"></div> <span style="color:#991b1b;font-weight:bold;">CLOSING</span></div>
 </div>
 <table>
   <thead>

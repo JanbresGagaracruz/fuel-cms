@@ -60,6 +60,9 @@ model lst_FuelContractPackages {
   PackageName           String    @db.VarChar(200)
   FuelContractID        Int
   CreatedAt             DateTime? @default(now())
+  isCertified           Boolean?  @default(false)
+  CertifiedBy           Int?
+  CertifiedAt           DateTime?
 
   contract lst_FuelContracts         @relation(fields: [FuelContractID], references: [FuelContractID], onDelete: NoAction, onUpdate: NoAction)
   details  lst_FuelContractDetail[]
@@ -134,6 +137,47 @@ model lst_Plant {
   date_entry    DateTime? @default(now())
 
   @@map("lst_Plant")
+}
+
+model rpt_AmendmentLog {
+  LogID                  Int       @id @default(autoincrement())
+  FuelContractID         Int
+  ContractNo             String    @db.VarChar(100)
+  SourcePackageId        Int
+  SourcePackageName      String    @db.VarChar(200)
+  DestinationPackageId   Int
+  DestinationPackageName String    @db.VarChar(200)
+  AmendedAmount          Decimal?  @db.Decimal(18, 4)   // EndRunningBalance transferred
+  AmendedVolume          Decimal?  @db.Decimal(18, 4)   // EndVolumeBalance transferred
+  InvoiceNo              String?   @db.VarChar(100)
+  CreatedBy              Int?
+  CreatedAt              DateTime  @default(now())
+
+  @@map("rpt_AmendmentLog")
+}
+
+model rpt_PackageSummary {
+  SummaryID             Int       @id @default(autoincrement())
+  FuelContractID        Int
+  FuelContractPackageId Int
+  ContractNo            String    @db.VarChar(100)
+  PackageName           String    @db.VarChar(200)
+  // Budget (amount) running balance
+  BegRunningBalance     Decimal?  @db.Decimal(18, 4)   // totalContractedAmount (before any deliveries)
+  EndRunningBalance     Decimal?  @db.Decimal(18, 4)   // remaining budget after last RUNNING row
+  // Volume running balance
+  BegVolumeBalance      Decimal?  @db.Decimal(18, 4)   // totalContractedVolume
+  EndVolumeBalance      Decimal?  @db.Decimal(18, 4)   // remaining volume after last RUNNING row
+  // Totals from RUNNING rows
+  TotalVolumeOrdered    Decimal?  @db.Decimal(18, 4)
+  TotalVolumeValidated  Decimal?  @db.Decimal(18, 4)
+  TotalAmountOrdered    Decimal?  @db.Decimal(18, 4)   // sum of G (ordered incl. VAT)
+  TotalAmountValidated  Decimal?  @db.Decimal(18, 4)   // sum of K (validated incl. VAT)
+  RunningRowCount       Int?
+  GeneratedBy           Int?
+  GeneratedAt           DateTime  @default(now())
+
+  @@map("rpt_PackageSummary")
 }
 
 model rpt_fcms {
