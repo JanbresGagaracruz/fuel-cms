@@ -52,27 +52,27 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Total Contracts"
-          value={formatNumber(stats.totalContracts)}
+          value={formatNumber(stats?.totalContracts)}
           icon={<FileText size={18} />}
           accent
         />
         <StatCard
           label="Active Contracts"
-          value={formatNumber(stats.activeContracts)}
+          value={formatNumber(stats?.activeContracts)}
           icon={<CheckCircle size={18} />}
           trend="up"
           trendLabel="Currently in effect"
         />
         <StatCard
           label="Expiring Soon"
-          value={formatNumber(stats.expiringSoon)}
+          value={formatNumber(stats?.expiringSoon)}
           icon={<AlertTriangle size={18} />}
           trend={stats.expiringSoon > 0 ? 'down' : 'neutral'}
           trendLabel="Within 90 days"
         />
         <StatCard
           label="Total Packages"
-          value={formatNumber(stats.totalPackages)}
+          value={formatNumber(stats?.totalPackages)}
           icon={<Package size={18} />}
         />
       </div>
