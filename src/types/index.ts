@@ -28,7 +28,7 @@ declare module 'next-auth/jwt' {
 }
 
 // App types
-export type ContractType = 'ORIGINAL' | 'AMENDMENT' | 'RENEWAL' | 'ADDENDUM'
+export type ContractType = 'ORIGINAL' | 'AMENDMENT' | 'RENEWAL' | 'ADDENDUM' | 'CLOSING' | 'RUNNING'
 
 export interface FuelContract {
   FuelContractID: number
