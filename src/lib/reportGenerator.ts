@@ -417,143 +417,143 @@ export function generatePackageReport(
     : ''
 
   return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>${pkg.PackageName}</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; font-size: 12px; padding: 20px; color: #000; }
-  .report-title    { font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
-  .report-subtitle { font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #333; }
-  .report-header { font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #333; }
-  .meta-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 4px 24px; font-size: 11px; border: 1px solid #ccc;
-    padding: 8px 12px; background: #f9f9f9; margin-bottom: 6px;
-  }
-  .meta-row   { display: flex; gap: 6px; }
-  .meta-label { font-weight: bold; white-space: nowrap; color: #444; }
-  .print-date { font-size: 10px; color: #666; text-align: right; margin-bottom: 12px; }
-  .legend      { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 10px; align-items: center; }
-  .legend-item { display: flex; align-items: center; gap: 4px; }
-  .legend-swatch { width: 12px; height: 12px; border: 1px solid #aaa; flex-shrink: 0; }
-  .mini-grid-badge {
-    display: inline-block; background: #cffafe; color: #0e7490;
-    border: 1px solid #a5f3fc; border-radius: 4px; padding: 2px 8px;
-    font-size: 11px; font-weight: bold; margin-bottom: 8px;
-  }
-  table { border-collapse: collapse; width: 100%; text-align: center; }
-  th, td { border: 1px solid #000; padding: 5px 6px; font-size: 11px; vertical-align: middle; }
-  thead th        { background: #d9d9d9; font-weight: bold; line-height: 1.3; }
-  .subhead th     { background: #efefef; font-weight: bold; }
-  .formula-row th { background: #e8e8e8; font-style: italic; font-size: 10px; color: #555; }
-  .row-original  td { background: #dbeafe; }
-  .row-amendment td { background: #fef9c3; }
-  .row-running   td { background: #ffffff; }
-  .row-renewal   td { background: #dcfce7; }
-  .row-addendum  td { background: #f3e8ff; }
-  .row-closing   td { background: #fee2e2; color: #991b1b; font-weight: bold; }
-  .summary-row   td { background: #f0fdf4; font-weight: bold; }
-  .highlight-yellow { background: #fff200 !important; font-weight: bold; color: red; }
-  .right  { text-align: right;  }
-  .left   { text-align: left;   }
-  .center { text-align: center; }
-  .totals-row td                { background: #d9d9d9; font-weight: bold; }
-  .totals-row .highlight-yellow { background: #fff200 !important; color: red; }
-  .notes { margin-top: 14px; font-size: 10px; color: #555; border-top: 1px solid #ccc; padding-top: 8px; line-height: 1.6; }
-  .signature-block { display: flex; gap: 48px; margin-top: 32px; }
-  .sig-item  { flex: 1; text-align: center; }
-  .sig-line  { border-top: 1px solid #000; margin-top: 28px; padding-top: 4px; font-weight: bold; font-size: 11px; }
-  .sig-label { font-size: 10px; color: #666; }
-  .print-btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: #f97316; color: white; border: none;
-    padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 14px;
-  }
-  .print-btn:hover { background: #ea6c0a; }
-  @media print {
-    body { padding: 10px; }
-    @page { size: A3 landscape; margin: 12mm; }
-    .no-print { display: none !important; }
-    .row-original  td { background: #dbeafe !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .row-amendment td { background: #fef9c3 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .row-closing   td { background: #fee2e2 !important; color: #991b1b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .summary-row   td { background: #f0fdf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .highlight-yellow { background: #fff200 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .mini-grid-badge  { background: #cffafe !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  }
-</style>
-</head>
-<body>
-<div class="report-title">NATIONAL POWER CORPORATION</div>
-<div class="report-header">SMALL POWER UTILITIES GROUP</div>
-<div class="report-header">OIL BASED FUEL SUPPLY AND DELIVERY MONITORING</div>
-<div class="report-subtitle">${pkg.PackageName}</div>
-<div class="meta-grid">
-  <div class="meta-row"><span class="meta-label">Contract No.:</span><span>${contract.ContractNo}</span></div>
-  <div class="meta-row"><span class="meta-label">Effectivity:</span><span>${fmtDate(contract.EffectivityFrom)} – ${fmtDate(contract.EffectivityTo)}</span></div>
-  <div class="meta-row"><span class="meta-label">Expiry Date:</span><span>${fmtDate(contract.ExpiredDate)}</span></div>
-  <div class="meta-row"><span class="meta-label">Representative:</span><span>${contract.Representative || '—'}</span></div>
-  <div class="meta-row"><span class="meta-label">Baseline Vol. (ORIG+AMEND):</span><span>${fmt(totalContractedVolume)} L</span></div>
-  <div class="meta-row"><span class="meta-label">Baseline Amt. (ORIG+AMEND):</span><span>₱ ${fmt(totalContractedAmount)}</span></div>
-</div>
-<div class="legend no-print">
-  <strong>Legend:</strong>
-  <div class="legend-item"><div class="legend-swatch" style="background:#dbeafe"></div> ORIGINAL</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:#fef9c3"></div> AMENDMENT</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:#f0fdf4;border-color:#86efac"></div> BALANCE AFTER AO</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:#fff;border-color:#888"></div> RUNNING</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:#fee2e2;border-color:#f87171"></div> <span style="color:#991b1b;font-weight:bold;">CLOSING</span></div>
-</div>
-<table>
-  <thead>
-    <tr>
-      <th colspan="${orderColspan}">Order</th>
-      <th colspan="5">Volume Ordered</th>
-      <th colspan="4">Validated</th>
-      <th colspan="2">Cumulative Total</th>
-      <th colspan="2">Contracted Running Balance</th>
-      <th rowspan="3">Petron Invoice No.</th>
-      <th rowspan="3">Volume Balance</th>
-    </tr>
-    <tr class="subhead">
-      <th>No.</th>${plantNameHeader}<th>Delivery Date</th><th>Est. Price<br>Peso / Liter</th><th>Volume<br>Liter</th>
-      <th>Amount<br>Peso</th><th>E-VAT<br>Pesos</th><th>Total Amount<br>Pesos</th>
-      <th>Volume<br>Liters</th><th>Adj. Amount<br>Pesos</th><th>E-VAT<br>Pesos</th><th>Total Amount<br>Pesos</th>
-      <th>Volume<br>Liters (L)</th><th>Amount<br>Pesos (M)</th>
-      <th>Remaining Budget<br>(Pesos)</th><th>Equivalent Volume<br>(Liters)</th>
-    </tr>
-    <tr class="formula-row">
-      <th>A</th><th>B</th><th>C</th><th>D</th>
-      <th>E=C×D</th><th>F=E×12%</th><th>G=E+F</th>
-      <th>H</th><th>I=H×C</th><th>J=I×12%</th><th>K=I+J</th>
-      <th>L</th><th>M</th><th>N</th><th>O</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${rowsHtml}
-    <tr class="totals-row">
-      <td colspan="${isMiniGrid ? 4 : 3}" class="left" style="padding-left:8px;">TOTAL (RUNNING / non-baseline)</td>
-      <td class="right">${fmt(totD)}</td><td class="right">${fmt(totE)}</td>
-      <td class="right">${fmt(totF)}</td><td class="right">${fmt(totG)}</td>
-      <td class="right">${fmt(totH)}</td><td class="right">${fmt(totI)}</td>
-      <td class="right">${fmt(totJ)}</td><td class="right">${fmt(totK)}</td>
-      <td class="right">${fmt(cumVolume)}</td><td class="right">${fmt(cumAmount)}</td>
-      <td class="right"></td><td class="right"></td><td></td><td></td>
-    </tr>
-  </tbody>
-</table>
-<div class="notes">
-  <strong>Notes:</strong><br>
-  a. The respective estimate price (C) of each fuel deliveries shall be used the preceeding month fuel rate based on MOPS price.<br>
-  b. Volume to be ordered (D) shall not exceed the Equivalent Volume (O) of the ramaining budget after the last delivery.<br>
-  c. The Cumulative Total in Peso of Validated Volume (M) shall not be more than the Contract amount indicated above.<br>
-  d. Validated Volume is the actual volume received net of applicable deductions.<br>
-  e. Validated Adjusted amount is based on adjusted price per liter.<br>
-  f.  Value of (L) is equal to the cumulative validated volume.<br>
-  g. Value of (M) is equal to the cumulative validated amount.<br>
-</div>
-</body>
-</html>`
+          <html>
+          <head>
+          <meta charset="UTF-8">
+          <title>${pkg.PackageName}</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: Arial, sans-serif; font-size: 12px; padding: 20px; color: #000; }
+            .report-title    { font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
+            .report-subtitle { font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #333; }
+            .report-header { font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #333; }
+            .meta-grid {
+              display: grid; grid-template-columns: repeat(3, 1fr);
+              gap: 4px 24px; font-size: 11px; border: 1px solid #ccc;
+              padding: 8px 12px; background: #f9f9f9; margin-bottom: 6px;
+            }
+            .meta-row   { display: flex; gap: 6px; }
+            .meta-label { font-weight: bold; white-space: nowrap; color: #444; }
+            .print-date { font-size: 10px; color: #666; text-align: right; margin-bottom: 12px; }
+            .legend      { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 10px; align-items: center; }
+            .legend-item { display: flex; align-items: center; gap: 4px; }
+            .legend-swatch { width: 12px; height: 12px; border: 1px solid #aaa; flex-shrink: 0; }
+            .mini-grid-badge {
+              display: inline-block; background: #cffafe; color: #0e7490;
+              border: 1px solid #a5f3fc; border-radius: 4px; padding: 2px 8px;
+              font-size: 11px; font-weight: bold; margin-bottom: 8px;
+            }
+            table { border-collapse: collapse; width: 100%; text-align: center; }
+            th, td { border: 1px solid #000; padding: 5px 6px; font-size: 11px; vertical-align: middle; }
+            thead th        { background: #d9d9d9; font-weight: bold; line-height: 1.3; }
+            .subhead th     { background: #efefef; font-weight: bold; }
+            .formula-row th { background: #e8e8e8; font-style: italic; font-size: 10px; color: #555; }
+            .row-original  td { background: #dbeafe; }
+            .row-amendment td { background: #fef9c3; }
+            .row-running   td { background: #ffffff; }
+            .row-renewal   td { background: #dcfce7; }
+            .row-addendum  td { background: #f3e8ff; }
+            .row-closing   td { background: #fee2e2; color: #991b1b; font-weight: bold; }
+            .summary-row   td { background: #f0fdf4; font-weight: bold; }
+            .highlight-yellow { background: #fff200 !important; font-weight: bold; color: red; }
+            .right  { text-align: right;  }
+            .left   { text-align: left;   }
+            .center { text-align: center; }
+            .totals-row td                { background: #d9d9d9; font-weight: bold; }
+            .totals-row .highlight-yellow { background: #fff200 !important; color: red; }
+            .notes { margin-top: 14px; font-size: 10px; color: #555; border-top: 1px solid #ccc; padding-top: 8px; line-height: 1.6; }
+            .signature-block { display: flex; gap: 48px; margin-top: 32px; }
+            .sig-item  { flex: 1; text-align: center; }
+            .sig-line  { border-top: 1px solid #000; margin-top: 28px; padding-top: 4px; font-weight: bold; font-size: 11px; }
+            .sig-label { font-size: 10px; color: #666; }
+            .print-btn {
+              display: inline-flex; align-items: center; gap: 6px;
+              background: #f97316; color: white; border: none;
+              padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 14px;
+            }
+            .print-btn:hover { background: #ea6c0a; }
+            @media print {
+              body { padding: 10px; }
+              @page { size: A3 landscape; margin: 12mm; }
+              .no-print { display: none !important; }
+              .row-original  td { background: #dbeafe !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .row-amendment td { background: #fef9c3 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .row-closing   td { background: #fee2e2 !important; color: #991b1b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .summary-row   td { background: #f0fdf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .highlight-yellow { background: #fff200 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .mini-grid-badge  { background: #cffafe !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
+          </style>
+          </head>
+          <body>
+          <div class="report-title">NATIONAL POWER CORPORATION</div>
+          <div class="report-header">SMALL POWER UTILITIES GROUP</div>
+          <div class="report-header">OIL BASED FUEL SUPPLY AND DELIVERY MONITORING</div>
+          <div class="report-subtitle">${pkg.PackageName}</div>
+          <div class="meta-grid no-print">
+            <div class="meta-row"><span class="meta-label">Contract No.:</span><span>${contract.ContractNo}</span></div>
+            <div class="meta-row"><span class="meta-label">Effectivity:</span><span>${fmtDate(contract.EffectivityFrom)} – ${fmtDate(contract.EffectivityTo)}</span></div>
+            <div class="meta-row"><span class="meta-label">Expiry Date:</span><span>${fmtDate(contract.ExpiredDate)}</span></div>
+            <div class="meta-row"><span class="meta-label">Representative:</span><span>${contract.Representative || '—'}</span></div>
+            <div class="meta-row"><span class="meta-label">Baseline Vol. (ORIG+AMEND):</span><span>${fmt(totalContractedVolume)} L</span></div>
+            <div class="meta-row"><span class="meta-label">Baseline Amt. (ORIG+AMEND):</span><span>₱ ${fmt(totalContractedAmount)}</span></div>
+          </div>
+          <div class="legend no-print">
+            <strong>Legend:</strong>
+            <div class="legend-item"><div class="legend-swatch" style="background:#dbeafe"></div> ORIGINAL</div>
+            <div class="legend-item"><div class="legend-swatch" style="background:#fef9c3"></div> AMENDMENT</div>
+            <div class="legend-item"><div class="legend-swatch" style="background:#f0fdf4;border-color:#86efac"></div> BALANCE AFTER AO</div>
+            <div class="legend-item"><div class="legend-swatch" style="background:#fff;border-color:#888"></div> RUNNING</div>
+            <div class="legend-item"><div class="legend-swatch" style="background:#fee2e2;border-color:#f87171"></div> <span style="color:#991b1b;font-weight:bold;">CLOSING</span></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th colspan="${orderColspan}">Order</th>
+                <th colspan="5">Volume Ordered</th>
+                <th colspan="4">Validated</th>
+                <th colspan="2">Cumulative Total</th>
+                <th colspan="2">Contracted Running Balance</th>
+                <th rowspan="3">Petron Invoice No.</th>
+                <th rowspan="3">Volume Balance</th>
+              </tr>
+              <tr class="subhead">
+                <th>No.</th>${plantNameHeader}<th>Delivery Date</th><th>Est. Price<br>Peso / Liter</th><th>Volume<br>Liter</th>
+                <th>Amount<br>Peso</th><th>E-VAT<br>Pesos</th><th>Total Amount<br>Pesos</th>
+                <th>Volume<br>Liters</th><th>Adj. Amount<br>Pesos</th><th>E-VAT<br>Pesos</th><th>Total Amount<br>Pesos</th>
+                <th>Volume<br>Liters (L)</th><th>Amount<br>Pesos (M)</th>
+                <th>Remaining Budget<br>(Pesos)</th><th>Equivalent Volume<br>(Liters)</th>
+              </tr>
+              <tr class="formula-row">
+                <th>A</th><th>B</th><th>C</th><th>D</th>
+                <th>E=C×D</th><th>F=E×12%</th><th>G=E+F</th>
+                <th>H</th><th>I=H×C</th><th>J=I×12%</th><th>K=I+J</th>
+                <th>L</th><th>M</th><th>N</th><th>O</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+              <tr class="totals-row">
+                <td colspan="${isMiniGrid ? 4 : 3}" class="left" style="padding-left:8px;">TOTAL</td>
+                <td class="right">${fmt(totD)}</td><td class="right">${fmt(totE)}</td>
+                <td class="right">${fmt(totF)}</td><td class="right">${fmt(totG)}</td>
+                <td class="right">${fmt(totH)}</td><td class="right">${fmt(totI)}</td>
+                <td class="right">${fmt(totJ)}</td><td class="right">${fmt(totK)}</td>
+                <td class="right">${fmt(cumVolume)}</td><td class="right">${fmt(cumAmount)}</td>
+                <td class="right"></td><td class="right"></td><td></td><td></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="notes">
+            <strong>Notes:</strong><br>
+            a. The respective estimate price (C) of each fuel deliveries shall be used the preceeding month fuel rate based on MOPS price.<br>
+            b. Volume to be ordered (D) shall not exceed the Equivalent Volume (O) of the ramaining budget after the last delivery.<br>
+            c. The Cumulative Total in Peso of Validated Volume (M) shall not be more than the Contract amount indicated above.<br>
+            d. Validated Volume is the actual volume received net of applicable deductions.<br>
+            e. Validated Adjusted amount is based on adjusted price per liter.<br>
+            f.  Value of (L) is equal to the cumulative validated volume.<br>
+            g. Value of (M) is equal to the cumulative validated amount.<br>
+          </div>
+          </body>
+        </html>`
 }
