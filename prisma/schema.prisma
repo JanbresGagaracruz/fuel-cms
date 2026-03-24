@@ -79,9 +79,9 @@ model lst_FuelContractDetail {
   PlantName             String?   @db.VarChar(200)
   FuelTypeID            Int?
   DeliveryDate          DateTime? @db.Date
-  VolumeOrdered         Decimal?  @db.Decimal(18, 4)
-  VolumeValidated       Decimal?  @db.Decimal(18, 4)
-  ContractPrice         Decimal?  @db.Decimal(18, 4)
+  VolumeOrdered         Decimal?  @db.Decimal(32, 20)
+  VolumeValidated       Decimal?  @db.Decimal(32, 20)
+  ContractPrice         Decimal?  @db.Decimal(32, 20)
   InvoiceNo             String?   @db.VarChar(100)
   FuelContractPackageId Int?
   ContractType          String?   @db.VarChar(50)
@@ -147,8 +147,8 @@ model rpt_AmendmentLog {
   SourcePackageName      String    @db.VarChar(200)
   DestinationPackageId   Int
   DestinationPackageName String    @db.VarChar(200)
-  AmendedAmount          Decimal?  @db.Decimal(18, 4)   // EndRunningBalance transferred
-  AmendedVolume          Decimal?  @db.Decimal(18, 4)   // EndVolumeBalance transferred
+  AmendedAmount          Decimal?  @db.Decimal(32, 20)   // EndRunningBalance transferred
+  AmendedVolume          Decimal?  @db.Decimal(32, 20)   // EndVolumeBalance transferred
   InvoiceNo              String?   @db.VarChar(100)
   CreatedBy              Int?
   CreatedAt              DateTime  @default(now())
@@ -163,16 +163,16 @@ model rpt_PackageSummary {
   ContractNo            String    @db.VarChar(100)
   PackageName           String    @db.VarChar(200)
   // Budget (amount) running balance
-  BegRunningBalance     Decimal?  @db.Decimal(18, 4)   // totalContractedAmount (before any deliveries)
-  EndRunningBalance     Decimal?  @db.Decimal(18, 4)   // remaining budget after last RUNNING row
+  BegRunningBalance     Decimal?  @db.Decimal(32, 20)   // totalContractedAmount (before any deliveries)
+  EndRunningBalance     Decimal?  @db.Decimal(32, 20)   // remaining budget after last RUNNING row
   // Volume running balance
-  BegVolumeBalance      Decimal?  @db.Decimal(18, 4)   // totalContractedVolume
-  EndVolumeBalance      Decimal?  @db.Decimal(18, 4)   // remaining volume after last RUNNING row
+  BegVolumeBalance      Decimal?  @db.Decimal(32, 20)   // totalContractedVolume
+  EndVolumeBalance      Decimal?  @db.Decimal(32, 20)   // remaining volume after last RUNNING row
   // Totals from RUNNING rows
-  TotalVolumeOrdered    Decimal?  @db.Decimal(18, 4)
-  TotalVolumeValidated  Decimal?  @db.Decimal(18, 4)
-  TotalAmountOrdered    Decimal?  @db.Decimal(18, 4)   // sum of G (ordered incl. VAT)
-  TotalAmountValidated  Decimal?  @db.Decimal(18, 4)   // sum of K (validated incl. VAT)
+  TotalVolumeOrdered    Decimal?  @db.Decimal(32, 20)
+  TotalVolumeValidated  Decimal?  @db.Decimal(32, 20)
+  TotalAmountOrdered    Decimal?  @db.Decimal(32, 20)   // sum of G (ordered incl. VAT)
+  TotalAmountValidated  Decimal?  @db.Decimal(32, 20)   // sum of K (validated incl. VAT)
   RunningRowCount       Int?
   GeneratedBy           Int?
   GeneratedAt           DateTime  @default(now())
@@ -190,20 +190,20 @@ model rpt_fcms {
   RowNo                 Int?       // null = baseline (ORIGINAL/AMENDMENT)
   ContractType          String?   @db.VarChar(50)
   DeliveryDate          DateTime? @db.Date
-  EstPrice              Decimal?  @db.Decimal(18, 4)   // C
-  VolumeOrdered         Decimal?  @db.Decimal(18, 4)   // D
-  AmountPeso            Decimal?  @db.Decimal(18, 4)   // E = C×D
-  EVatOrdered           Decimal?  @db.Decimal(18, 4)   // F = E×12%
-  TotalOrdered          Decimal?  @db.Decimal(18, 4)   // G = E+F
-  VolumeValidated       Decimal?  @db.Decimal(18, 4)   // H
-  AdjAmount             Decimal?  @db.Decimal(18, 4)   // I = H×C
-  EVatValidated         Decimal?  @db.Decimal(18, 4)   // J = I×12%
-  TotalValidated        Decimal?  @db.Decimal(18, 4)   // K = I+J
-  CumulativeVolume      Decimal?  @db.Decimal(18, 4)   // L = ΣH
-  CumulativeAmount      Decimal?  @db.Decimal(18, 4)   // M = ΣK
-  RemainingBudget       Decimal?  @db.Decimal(18, 4)   // N
-  EquivalentVolume      Decimal?  @db.Decimal(18, 4)   // O
-  VolumeBalance         Decimal?  @db.Decimal(18, 4)
+  EstPrice              Decimal?  @db.Decimal(32, 20)   // C
+  VolumeOrdered         Decimal?  @db.Decimal(32, 20)   // D
+  AmountPeso            Decimal?  @db.Decimal(32, 20)   // E = C×D
+  EVatOrdered           Decimal?  @db.Decimal(32, 20)   // F = E×12%
+  TotalOrdered          Decimal?  @db.Decimal(32, 20)   // G = E+F
+  VolumeValidated       Decimal?  @db.Decimal(32, 20)   // H
+  AdjAmount             Decimal?  @db.Decimal(32, 20)   // I = H×C
+  EVatValidated         Decimal?  @db.Decimal(32, 20)   // J = I×12%
+  TotalValidated        Decimal?  @db.Decimal(32, 20)   // K = I+J
+  CumulativeVolume      Decimal?  @db.Decimal(32, 20)   // L = ΣH
+  CumulativeAmount      Decimal?  @db.Decimal(32, 20)   // M = ΣK
+  RemainingBudget       Decimal?  @db.Decimal(32, 20)   // N
+  EquivalentVolume      Decimal?  @db.Decimal(32, 20)   // O
+  VolumeBalance         Decimal?  @db.Decimal(32, 20)
   InvoiceNo             String?   @db.VarChar(100)
   PlantName             String?   @db.VarChar(200)
   FunctionalGroup       String?   @db.VarChar(200)
