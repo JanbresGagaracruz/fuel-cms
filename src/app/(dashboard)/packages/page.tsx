@@ -21,17 +21,26 @@ export default function PackagesPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const params = new URLSearchParams({ page: String(page), pageSize: '15' })
-    const [pkgRes, cRes] = await Promise.all([
-      fetch(`/api/packages?${params}`),
-      fetch('/api/contracts?pageSize=100'),
-    ])
-    const pkgData = await pkgRes.json()
-    const cData = await cRes.json()
-    setPackages(pkgData.data || [])
-    setTotal(pkgData.total || 0)
-    setContracts(cData.data || [])
-    setLoading(false)
+    try {
+      const params = new URLSearchParams({ page: String(page), pageSize: '15' })
+      const [pkgRes, cRes] = await Promise.all([
+        fetch(`/api/packages?${params}`),
+        fetch('/api/contracts?pageSize=100'),
+      ])
+      const pkgData = pkgRes.ok ? await pkgRes.json() : {}
+      const cData = cRes.ok ? await cRes.json() : {}
+      
+      setPackages(pkgData.data || [])
+      setTotal(pkgData.total || 0)
+      setContracts(cData.data || [])
+    } catch (error) {
+      console.error('Failed to load data:', error)
+      setPackages([])
+      setTotal(0)
+      setContracts([])
+    } finally {
+      setLoading(false)
+    }
   }, [page])
 
   useEffect(() => { load() }, [load])
