@@ -281,7 +281,7 @@ function DetailFormFields({ form, onChange, packages, fuelTypes, plants, package
       {/* Contract Price — read-only when auto-populated via Amendment */}
       <div className="space-y-1.5">
         <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
-          Contract Price (₱/L)
+          Contract Price/Fuel Price (₱/L)
           {isAmendment && form.amendSourcePackageId && (
             <span className="ml-2 text-amber-500 font-400 normal-case">(from source ending balance)</span>
           )}
@@ -699,7 +699,7 @@ export default function ContractDetailPage() {
   if (loading) return <ContractDetailSkeleton />
   if (!contract) return (
     <div className="text-center py-20">
-      <p className="text-[var(--text-muted)]">Contract not found.</p>
+      <p className="text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-4 py-3 rounded-lg">Contract not found.</p>
       <Link href="/contracts" className="btn-primary mt-4 inline-flex">← Back</Link>
     </div>
   )
@@ -916,7 +916,7 @@ export default function ContractDetailPage() {
                         >
                           <FileBarChart2 size={12} /> Generate Report
                         </button>
-                        {!pkg.isCertified || expiryStatus !== 'expired' && (
+                        {!pkg.isCertified && expiryStatus !== 'expired' && (
                           <button
                             onClick={() => {
                               setDetailForm({ ...defaultDetailForm, FuelContractPackageId: String(pkg.FuelContractPackageId) })
