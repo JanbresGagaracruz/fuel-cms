@@ -736,6 +736,7 @@ export default function ContractDetailPage() {
           </div>
           <p className="text-[var(--text-muted)] text-sm mt-1">{contract.Representative || 'No representative'}</p>
         </div>
+        {expiryStatus !== 'expired' && (
         <div className="flex items-center gap-2">
           <button onClick={() => setEditModal(true)} className="btn-secondary">
             <Edit2 size={14} /> Edit
@@ -744,6 +745,7 @@ export default function ContractDetailPage() {
             <Trash2 size={14} /> Delete
           </button>
         </div>
+        )}
       </div>
 
       {/* ── Contract Info Card — full width, content-fitted ── */}
@@ -810,17 +812,19 @@ export default function ContractDetailPage() {
             <Package size={16} /> Packages
             <span className="text-sm font-400 text-[var(--text-muted)]">({contract.packages?.length ?? 0})</span>
           </h2>
-          <div className="flex gap-2">
-            <button
-              onClick={() => { setDetailForm({ ...defaultDetailForm }); setDetailModal(true) }}
-              className="btn-secondary text-xs"
-            >
-              <ClipboardList size={13} /> Add Detail
-            </button>
-            <button onClick={() => setPkgModal(true)} className="btn-primary text-xs">
-              <Plus size={13} /> Add Package
-            </button>
-          </div>
+          {expiryStatus !== 'expired' && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setDetailForm({ ...defaultDetailForm }); setDetailModal(true) }}
+                className="btn-secondary text-xs"
+              >
+                <ClipboardList size={13} /> Add Detail
+              </button>
+              <button onClick={() => setPkgModal(true)} className="btn-primary text-xs">
+                <Plus size={13} /> Add Package
+              </button>
+            </div>
+          )}
         </div>
 
         {(!contract.packages || contract.packages.length === 0) ? (
@@ -867,21 +871,23 @@ export default function ContractDetailPage() {
 
                   {/* Action buttons */}
                   <div className="flex items-center gap-2 mx-3 flex-shrink-0">
-                    {/* Certify button — only shown when not yet certified */}
-                    {!pkg.isCertified ? (
-                      <button
-                        onClick={() => handleCertifyPackage(pkg)}
-                        disabled={certifyingPkg === pkg.FuelContractPackageId}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-500 transition-all whitespace-nowrap shadow-sm disabled:opacity-60 disabled:cursor-wait"
-                        title="Certify this package — locks all details"
-                      >
-                        <Lock size={13} />
-                        {certifyingPkg === pkg.FuelContractPackageId ? 'Certifying…' : 'Certify'}
-                      </button>
-                    ) : (
-                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-600 whitespace-nowrap border border-green-200 dark:border-green-800">
-                        <CheckCircle size={13} /> Certified
-                      </span>
+                  {/* Certify button — only shown when not yet certified */}
+                    {expiryStatus !== 'expired' && (
+                      !pkg.isCertified ? (
+                        <button
+                          onClick={() => handleCertifyPackage(pkg)}
+                          disabled={certifyingPkg === pkg.FuelContractPackageId}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-500 transition-all whitespace-nowrap shadow-sm disabled:opacity-60 disabled:cursor-wait"
+                          title="Certify this package — locks all details"
+                        >
+                          <Lock size={13} />
+                          {certifyingPkg === pkg.FuelContractPackageId ? 'Certifying…' : 'Certify'}
+                        </button>
+                      ) : (
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-600 whitespace-nowrap border border-green-200 dark:border-green-800">
+                          <CheckCircle size={13} /> Certified
+                        </span>
+                      )
                     )}
                     <button
                       onClick={() => handleGenerateReport(pkg)}
@@ -910,7 +916,7 @@ export default function ContractDetailPage() {
                         >
                           <FileBarChart2 size={12} /> Generate Report
                         </button>
-                        {!pkg.isCertified && (
+                        {!pkg.isCertified || expiryStatus !== 'expired' && (
                           <button
                             onClick={() => {
                               setDetailForm({ ...defaultDetailForm, FuelContractPackageId: String(pkg.FuelContractPackageId) })
@@ -969,26 +975,27 @@ export default function ContractDetailPage() {
                                 <td className="text-xs text-[var(--text-secondary)]">{d.InvoiceNo || '—'}</td>
                                 <td>
                                   <div className="flex items-center gap-1">
-                                    {pkg.isCertified ? (
+                                    {pkg.isCertified || expiryStatus === 'expired' ? (
                                       <span className="text-xs text-[var(--text-muted)] px-1.5 flex items-center gap-1">
                                         <Lock size={11} /> Locked
                                       </span>
                                     ) : (
                                       <>
-                                    <button
-                                      onClick={() => openEditDetail(d)}
-                                      className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-brand-500 transition-colors"
-                                      title="Edit"
-                                    >
-                                      <Edit2 size={13} />
-                                    </button>
-                                    <button
-                                      onClick={() => openDeleteDetail(d)}
-                                      className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-[var(--text-muted)] hover:text-red-500 transition-colors"
-                                      title="Delete"
-                                    >
-                                      <Trash2 size={13} />
-                                    </button>
+                                        <button
+                                          onClick={() => openEditDetail(d)}
+                                          className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-brand-500 transition-colors"
+                                          title="Edit"
+                                        >
+                                          <Edit2 size={13} />
+                                        </button>
+
+                                        <button
+                                          onClick={() => openDeleteDetail(d)}
+                                          className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-[var(--text-muted)] hover:text-red-500 transition-colors"
+                                          title="Delete"
+                                        >
+                                          <Trash2 size={13} />
+                                        </button>
                                       </>
                                     )}
                                   </div>
