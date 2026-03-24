@@ -152,6 +152,7 @@ function LoginContent() {
                 required
                 autoFocus
                 className="input-field"
+                autoComplete="username"
               />
             </div>
 
@@ -167,6 +168,7 @@ function LoginContent() {
                   placeholder="Enter your password"
                   required
                   className="input-field pr-10"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
