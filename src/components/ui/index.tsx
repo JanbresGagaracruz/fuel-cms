@@ -202,7 +202,7 @@ export function ConfirmDialog({
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative card w-full max-w-sm animate-fade-up p-6">
         <h3 className="font-display font-600 text-[var(--text-primary)] mb-2">{title}</h3>
-        <p className="text-sm text-[var(--text-muted)] mb-6">{description}</p>
+        <p className="text-sm text-[var(--text-muted)] mb-6 whitespace-pre-line">{description}</p>
         <div className="flex justify-end gap-2">
           <button className="btn-secondary" onClick={onClose}>Cancel</button>
           <button
