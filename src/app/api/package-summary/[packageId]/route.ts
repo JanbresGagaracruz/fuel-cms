@@ -5,12 +5,13 @@ import { prisma } from '@/lib/prisma'
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { packageId: string } }
+  { params }: { params: Promise<{ packageId: string }>  }
 ) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const packageId = parseInt(params.packageId)
+  const resolvedParams = await params
+  const packageId = parseInt(resolvedParams.packageId)
   if (isNaN(packageId)) {
     return NextResponse.json({ error: 'Invalid packageId' }, { status: 400 })
   }

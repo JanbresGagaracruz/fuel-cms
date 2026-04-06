@@ -58,7 +58,9 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 })
 
   const id  = parseInt((await params).id)
-  const pkg = await prisma.lst_FuelContractPackages.findUnique({ where: { FuelContractPackageId: id } })
+  const pkg = await prisma.lst_FuelContractPackages.findUnique({ 
+    where: { FuelContractPackageId: id }
+  })
   if (!pkg) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   if (pkg.isCertified) {
