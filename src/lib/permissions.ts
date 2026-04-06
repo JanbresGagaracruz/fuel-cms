@@ -15,26 +15,32 @@ export const ACCESS = {
 
 export type AccessLevel = typeof ACCESS[keyof typeof ACCESS]
 
+/** Can the user read/view records? (all levels) */
 export function canRead(level: number): boolean {
   return level >= ACCESS.VIEWER
 }
 
+/** Can the user create new records? */
 export function canCreate(level: number): boolean {
   return level >= ACCESS.STAFF
 }
 
+/** Can the user edit/update existing records? */
 export function canUpdate(level: number): boolean {
   return level >= ACCESS.STAFF
 }
 
+/** Can the user delete records? */
 export function canDelete(level: number): boolean {
   return level >= ACCESS.ADMIN
 }
 
+/** Can the user manage users? */
 export function canManageUsers(level: number): boolean {
   return level >= ACCESS.ADMIN
 }
 
+/** Human-readable label for an access level */
 export function accessLevelLabel(level: number): string {
   switch (level) {
     case ACCESS.VIEWER:      return 'Viewer'
@@ -45,6 +51,7 @@ export function accessLevelLabel(level: number): string {
   }
 }
 
+/** Tailwind badge variant for an access level */
 export function accessLevelVariant(level: number): 'default' | 'info' | 'warning' | 'danger' {
   switch (level) {
     case ACCESS.VIEWER:      return 'default'

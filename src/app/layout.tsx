@@ -3,7 +3,7 @@ import './globals.css'
 import { Providers } from './providers'
 
 export const metadata: Metadata = {
-  title: 'FCMS — Fuel Contract Management System',
+  title: 'FuelContract MS — Contract Management System',
   description: 'Manage fuel supply contracts, packages, and delivery details efficiently.',
   icons: { icon: '/npc.ico' },
 }

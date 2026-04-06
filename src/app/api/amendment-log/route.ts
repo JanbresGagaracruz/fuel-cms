@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const {
     FuelContractID, ContractNo,
-    SourcePackageId, SourcePackageName,
+    SourcePackageId, SourcePackageName, SourceContractNo,
     DestinationPackageId, DestinationPackageName,
     AmendedAmount, AmendedVolume, InvoiceNo,
   } = body
@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       ContractNo,
       SourcePackageId:        parseInt(SourcePackageId),
       SourcePackageName,
+      SourceContractNo:       SourceContractNo || ContractNo,
       DestinationPackageId:   parseInt(DestinationPackageId),
       DestinationPackageName,
       AmendedAmount:          AmendedAmount   != null ? AmendedAmount   : null,

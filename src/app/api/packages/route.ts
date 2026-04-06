@@ -13,9 +13,11 @@ export async function GET(req: NextRequest) {
   const contractId = searchParams.get('contractId')
   const page = parseInt(searchParams.get('page') || '1')
   const pageSize = parseInt(searchParams.get('pageSize') || '15')
+  const search = searchParams.get('search') || ''
 
   const where: any = {}
   if (contractId) where.FuelContractID = parseInt(contractId)
+  if (search) where.PackageName = { contains: search}
 
   const [data, total] = await Promise.all([
     prisma.lst_FuelContractPackages.findMany({

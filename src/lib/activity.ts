@@ -54,4 +54,5 @@ export const MODULES = {
   PACKAGES: 'Contract Packages',
   DETAILS: 'Contract Details',
   USERS: 'Users',
+  SIGNATORIES: 'Signatories',
 } as const

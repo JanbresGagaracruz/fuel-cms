@@ -30,6 +30,15 @@ export interface ReportContract {
   ExpiredDate:     string | null
   SupplierID:      number | null
   isMiniGrid?:     boolean
+  signatories?: {
+    Title?:          string | null
+    PreparedByName?: string | null
+    PreparedByPos?:  string | null
+    ReviewedByName?: string | null
+    ReviewedByPos?:  string | null
+    NotedByName?:    string | null
+    NotedByPos?:     string | null
+  } | null
 }
 
 // Shape saved to rpt_PackageSummary
@@ -371,6 +380,36 @@ export function generatePackageReport(
   const orderColspan  = isMiniGrid ? 3 : 2   // No. + [Plant Name] + Delivery Date + Price + Volume
   const summaryColspan = isMiniGrid ? 14 : 13  // all cols before N
 
+  // Inside generatePackageReport, replace the old signature-block HTML:
+
+  const sig = contract.signatories
+
+  const hasSignatories =
+  sig &&
+  (sig.PreparedByName || sig.ReviewedByName || sig.NotedByName);
+
+  const sigBlock = !hasSignatories
+    ? `<div class="sig-item sig-name-missing">** Please Create Signatories for this Contract.</div>`
+    : `
+      <div class="signature-block">
+        <div class="sig-item">
+          <div class="sig-line">Prepared by</div>
+          <div class="sig-name">${sig?.PreparedByName || '&nbsp;'}</div>
+          <div class="sig-pos">${sig?.PreparedByPos || '&nbsp;'}</div>
+        </div>
+        <div class="sig-item">
+          <div class="sig-line">Reviewed by</div>
+          <div class="sig-name">${sig?.ReviewedByName || '&nbsp;'}</div>
+          <div class="sig-pos">${sig?.ReviewedByPos || '&nbsp;'}</div>
+        </div>
+        <div class="sig-item">
+          <div class="sig-line">Noted by</div>
+          <div class="sig-name">${sig?.NotedByName || '&nbsp;'}</div>
+          <div class="sig-pos">${sig?.NotedByPos || '&nbsp;'}</div>
+        </div>
+      </div>
+  `;
+
   const rowsHtml = rows.map((r: any) => {
     if (r.isSummary) {
       return `
@@ -462,16 +501,30 @@ export function generatePackageReport(
             .totals-row td                { background: #d9d9d9; font-weight: bold; }
             .totals-row .highlight-yellow { background: #fff200 !important; color: red; }
             .notes { margin-top: 14px; font-size: 10px; color: #555; border-top: 1px solid #ccc; padding-top: 8px; line-height: 1.6; }
-            .signature-block { display: flex; gap: 48px; margin-top: 32px; }
-            .sig-item  { flex: 1; text-align: center; }
-            .sig-line  { border-top: 1px solid #000; margin-top: 28px; padding-top: 4px; font-weight: bold; font-size: 11px; }
-            .sig-label { font-size: 10px; color: #666; }
-            .print-btn {
-              display: inline-flex; align-items: center; gap: 6px;
-              background: #f97316; color: white; border: none;
-              padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 14px;
+            .signature-block {
+              display: flex; gap: 48px; margin-top: 40px;
             }
-            .print-btn:hover { background: #ea6c0a; }
+            .sig-item {
+              flex: 1; text-align: center;
+            }
+            .sig-name {
+              font-size: 12px; font-weight: bold; color: #000;
+              min-height: 18px;
+            }
+            .sig-pos {
+              font-size: 10px; color: #444; min-height: 14px; margin-bottom: 28px;
+            }
+            .sig-line {
+              font-size: 10px; color: #666; font-style: italic; padding-bottom: 8px;
+            }
+            .sig-title {
+              text-align: center; margin-top: 10px;
+              font-size: 10px; color: #555; font-style: italic;
+            }
+            .sig-name-missing {
+              font-size: 12px; font-weight: bold; color: #b00020;
+              min-height: 18px;
+            }
             @media print {
               body { padding: 10px; }
               @page { size: A3 landscape; margin: 12mm; }
@@ -554,6 +607,7 @@ export function generatePackageReport(
             f.  Value of (L) is equal to the cumulative validated volume.<br>
             g. Value of (M) is equal to the cumulative validated amount.<br>
           </div>
+          ${sigBlock}
           </body>
-        </html>`
+          </html>`
 }

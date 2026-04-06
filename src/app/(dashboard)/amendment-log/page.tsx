@@ -46,7 +46,6 @@ export default function AmendmentLogPage() {
 
       {/* Search */}
       <div className="relative max-w-sm">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
         <input
           type="text"
           placeholder="Search by contract no. or package…"
@@ -102,9 +101,14 @@ export default function AmendmentLogPage() {
 
                     {/* Source */}
                     <td>
-                      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs font-500 text-amber-700 dark:text-amber-400">
-                        {l.SourcePackageName}
-                      </span>
+                      <div className="space-y-0.5">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs font-500 text-amber-700 dark:text-amber-400">
+                          {l.SourcePackageName}
+                        </span>
+                        {l.SourceContractNo && l.SourceContractNo !== l.ContractNo && (
+                          <p className="text-xs text-[var(--text-muted)] pl-1">from {l.SourceContractNo}</p>
+                        )}
+                      </div>
                     </td>
 
                     {/* Arrow */}
