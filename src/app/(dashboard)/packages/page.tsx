@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Package, Plus, Search, RefreshCw } from 'lucide-react'
 import {
@@ -8,8 +8,10 @@ import {
   Modal, InputField, SelectField
 } from '@/components/ui/index'
 import { formatDate } from '@/lib/utils'
+import { useToast } from '@/components/ui/Toast'
 
 export default function PackagesPage() {
+  const { success, error: toastError } = useToast()
   const [packages, setPackages] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -18,21 +20,22 @@ export default function PackagesPage() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ PackageName: '', FuelContractID: '' })
   const [saving, setSaving] = useState(false)
+  const [pkgStatus, setPkgStatus] = useState<'idle' | 'checking' | 'taken' | 'available'>('idle')
+  const pkgNameTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: '15' })
-      const [pkgRes, cRes] = await Promise.all([
-        fetch(`/api/packages?${params}`),
-        fetch('/api/contracts?pageSize=100'),
-      ])
-      const pkgData = pkgRes.ok ? await pkgRes.json() : {}
-      const cData = cRes.ok ? await cRes.json() : {}
-      
-      setPackages(pkgData.data || [])
-      setTotal(pkgData.total || 0)
-      setContracts(cData.data || [])
+        const params = new URLSearchParams({ page: String(page), pageSize: '15' })
+        const [pkgRes, cRes] = await Promise.all([
+          fetch(`/api/packages?${params}`),
+          fetch('/api/contracts?pageSize=100'),
+        ])
+        const pkgData = await pkgRes.json()
+        const cData = await cRes.json()
+        setPackages(pkgData.data || [])
+        setTotal(pkgData.total || 0)
+        setContracts(cData.data || [])
     } catch (error) {
       console.error('Failed to load data:', error)
       setPackages([])
@@ -47,16 +50,27 @@ export default function PackagesPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (pkgStatus === 'taken') {
+      toastError('Duplicate package name', 'Please use a different package name.')
+      return
+    }
     setSaving(true)
-    await fetch('/api/packages', {
+    const res = await fetch('/api/packages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
     })
+
+    if (res.ok) {
+      success('Package created', 'The package has been added successfully.')
+      setForm({ PackageName: '', FuelContractID: '' })
+      setShowModal(false)
+      load()
+    } else {
+      const data = await res.json()
+      toastError('Failed to create package', data.error || 'An error occurred while creating the package.')
+    }
     setSaving(false)
-    setShowModal(false)
-    setForm({ PackageName: '', FuelContractID: '' })
-    load()
   }
 
   return (
@@ -67,7 +81,7 @@ export default function PackagesPage() {
         actions={
           <>
             <button onClick={load} className="btn-secondary p-2"><RefreshCw size={15} /></button>
-            <button onClick={() => setShowModal(true)} className="btn-primary">
+            <button onClick={() => { setShowModal(true); setForm({ PackageName: '', FuelContractID: '' }); setPkgStatus('idle') }} className="btn-primary">
               <Plus size={15} /> Add Package
             </button>
           </>
@@ -140,7 +154,7 @@ export default function PackagesPage() {
         <Pagination page={page} total={total} pageSize={15} onChange={setPage} />
       </div>
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="Add Package">
+      <Modal open={showModal} onClose={() => { setShowModal(false); setForm({ PackageName: '', FuelContractID: '' }); setPkgStatus('idle') }} title="Add Package">
         <form onSubmit={handleCreate} className="space-y-4">
           <SelectField
             label="Fuel Contract"
@@ -153,15 +167,75 @@ export default function PackagesPage() {
             placeholder="Select a contract…"
             required
           />
-          <InputField
+          {/* <InputField
             label="Package Name"
             value={form.PackageName}
             onChange={(v) => setForm({ ...form, PackageName: v })}
             placeholder="e.g. Package A – Diesel Supply"
             required
-          />
+          /> */}
+          {/* Contract No. with duplicate checker */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
+              Contract No. <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={form.PackageName}
+                onChange={(e) => {
+                  const v = e.target.value.toUpperCase()
+                  setForm({ ...form, PackageName: v })
+                  setPkgStatus('idle')
+                  if (pkgNameTimer.current) clearTimeout(pkgNameTimer.current)
+                  if (!v.trim()) return
+                  setPkgStatus('checking')
+                  pkgNameTimer.current = setTimeout(async () => {
+                    const res  = await fetch(`/api/packages?search=${encodeURIComponent(v.trim())}&contractId=${form.FuelContractID}&pageSize=1`)
+                    const data = await res.json()
+
+                    console.log('Duplicate check result:', data)
+                    const exact = (data.data || []).some(
+                      (c: any) => c.PackageName.toLowerCase() === v.trim().toLowerCase()
+                    )
+                    setPkgStatus(exact ? 'taken' : 'available')
+                  }, 500)
+                }}
+                required
+                placeholder="e.g. LOG MSSP 2026-xx-xxx"
+                className={`input-field pr-8 ${
+                  pkgStatus === 'taken'
+                    ? 'border-red-400 focus:ring-red-400'
+                    : pkgStatus === 'available'
+                    ? 'border-green-400 focus:ring-green-400'
+                    : ''
+                }`}
+              />
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                {pkgStatus === 'checking' && (
+                  <div className="w-3.5 h-3.5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
+                )}
+                {pkgStatus === 'available' && (
+                  <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                {pkgStatus === 'taken' && (
+                  <svg className="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </div>
+            </div>
+            {pkgStatus === 'taken' && (
+              <p className="text-xs text-red-500 mt-0.5">This contract number already exists.</p>
+            )}
+            {pkgStatus === 'available' && (
+              <p className="text-xs text-green-500 mt-0.5">Contract number is available.</p>
+            )}
+          </div>
           <div className="flex justify-end gap-2">
-            <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+            <button type="button" className="btn-secondary" onClick={() => { setShowModal(false); setForm({ PackageName: '', FuelContractID: '' }); setPkgStatus('idle') }}>Cancel</button>
             <button type="submit" className="btn-primary" disabled={saving}>
               {saving ? 'Adding…' : <><Plus size={14} /> Add Package</>}
             </button>

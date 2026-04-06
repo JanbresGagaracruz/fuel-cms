@@ -35,6 +35,20 @@ model lst_User {
   @@map("lst_User")
 }
 
+model lst_ContractDocuments {
+  DocumentID     Int       @id @default(autoincrement())
+  FuelContractID Int
+  FileName       String    @db.VarChar(300)   // original file name shown to users
+  StoredName     String    @db.VarChar(300)   // unique name on disk (uuid + ext)
+  FileType       String?   @db.VarChar(100)   // MIME type
+  FileSizeBytes  Int?
+  FilePath       String    @db.VarChar(500)   // relative path: /uploads/contracts/<id>/<storedName>
+  UploadedBy     Int?
+  UploadedAt     DateTime  @default(now())
+
+  @@map("lst_ContractDocuments")
+}
+
 model lst_FuelContracts {
   FuelContractID   Int       @id @default(autoincrement())
   ContractNo       String    @db.VarChar(100)
@@ -145,10 +159,11 @@ model rpt_AmendmentLog {
   ContractNo             String    @db.VarChar(100)
   SourcePackageId        Int
   SourcePackageName      String    @db.VarChar(200)
+  SourceContractNo       String?   @db.VarChar(100)   // may differ from ContractNo for cross-contract
   DestinationPackageId   Int
   DestinationPackageName String    @db.VarChar(200)
   AmendedAmount          Decimal?  @db.Decimal(32, 20)   // EndRunningBalance transferred
-  AmendedVolume          Decimal?  @db.Decimal(32, 20)   // EndVolumeBalance transferred
+  AmendedVolume          Decimal?  @db.Decimal(32, 20) 
   InvoiceNo              String?   @db.VarChar(100)
   CreatedBy              Int?
   CreatedAt              DateTime  @default(now())
@@ -172,7 +187,7 @@ model rpt_PackageSummary {
   TotalVolumeOrdered    Decimal?  @db.Decimal(32, 20)
   TotalVolumeValidated  Decimal?  @db.Decimal(32, 20)
   TotalAmountOrdered    Decimal?  @db.Decimal(32, 20)   // sum of G (ordered incl. VAT)
-  TotalAmountValidated  Decimal?  @db.Decimal(32, 20)   // sum of K (validated incl. VAT)
+  TotalAmountValidated  Decimal?  @db.Decimal(32, 20)  // sum of K (validated incl. VAT)
   RunningRowCount       Int?
   GeneratedBy           Int?
   GeneratedAt           DateTime  @default(now())
@@ -228,4 +243,25 @@ model ActivityTrail {
   user   lst_User @relation(fields: [userId], references: [UserID], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("ActivityTrail")
+}
+
+model lst_ContractSignatories {
+  SignatoryID     Int       @id @default(autoincrement())
+  FuelContractID  Int?      // null = default/global signatories
+  Title           String?   @db.VarChar(200)  // e.g. "Fuel Supply Contract 2025"
+
+  PreparedByName  String?   @db.VarChar(200)
+  PreparedByPos   String?   @db.VarChar(200)
+
+  ReviewedByName  String?   @db.VarChar(200)
+  ReviewedByPos   String?   @db.VarChar(200)
+
+  NotedByName     String?   @db.VarChar(200)
+  NotedByPos      String?   @db.VarChar(200)
+
+  CreatedBy       Int?
+  CreatedAt       DateTime  @default(now())
+  UpdatedAt       DateTime  @updatedAt
+
+  @@map("lst_ContractSignatories")
 }

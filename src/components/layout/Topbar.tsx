@@ -19,6 +19,7 @@ const routeLabels: Record<string, string> = {
   '/settings':        'Settings',
   '/running-balance': 'Running Balance',
   '/amendment-log':   'Amendment Log',
+  '/signatories': 'Signatories',
 }
 
 interface TopbarProps {

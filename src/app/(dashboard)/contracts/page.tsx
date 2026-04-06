@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { Plus, Search, Filter, RefreshCw } from 'lucide-react'
@@ -46,6 +46,8 @@ export default function ContractsPage() {
   const [showModal, setShowModal] = useState(false)
   const [form,      setForm]      = useState(defaultForm)
   const [saving,    setSaving]    = useState(false)
+  const [contractNoStatus, setContractNoStatus] = useState<'idle' | 'checking' | 'taken' | 'available'>('idle')
+  const contractNoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Supplier lookup
   const [suppliers, setSuppliers] = useState<any[]>([])
@@ -73,6 +75,10 @@ export default function ContractsPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (contractNoStatus === 'taken') {
+      toastError('Duplicate contract number', 'Please use a different contract number.')
+      return
+    }
     setSaving(true)
     const res = await fetch('/api/contracts', {
       method: 'POST',
@@ -254,17 +260,68 @@ export default function ContractsPage() {
       </div>
 
       {/* Create Modal */}
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="New Fuel Contract" size="lg">
+      <Modal open={showModal} onClose={() => { setShowModal(false); setForm(defaultForm); setContractNoStatus('idle') }} title="New Fuel Contract" size="lg">
         <form onSubmit={handleCreate} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-            <InputField
-              label="Contract No. *"
-              value={form.ContractNo}
-              onChange={(v) => setForm({ ...form, ContractNo: v })}
-              required
-              placeholder="e.g. FC-2025-001"
-            />
+            {/* Contract No. with duplicate checker */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
+                Contract No. <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={form.ContractNo}
+                  onChange={(e) => {
+                    const v = e.target.value.toUpperCase()
+                    setForm({ ...form, ContractNo: v })
+                    setContractNoStatus('idle')
+                    if (contractNoTimer.current) clearTimeout(contractNoTimer.current)
+                    if (!v.trim()) return
+                    setContractNoStatus('checking')
+                    contractNoTimer.current = setTimeout(async () => {
+                      const res  = await fetch(`/api/contracts?search=${encodeURIComponent(v.trim())}&pageSize=1`)
+                      const data = await res.json()
+                      const exact = (data.data || []).some(
+                        (c: any) => c.ContractNo.toLowerCase() === v.trim().toLowerCase()
+                      )
+                      setContractNoStatus(exact ? 'taken' : 'available')
+                    }, 500)
+                  }}
+                  required
+                  placeholder="e.g. LOG MSSP 2026-xx-xxx"
+                  className={`input-field pr-8 ${
+                    contractNoStatus === 'taken'
+                      ? 'border-red-400 focus:ring-red-400'
+                      : contractNoStatus === 'available'
+                      ? 'border-green-400 focus:ring-green-400'
+                      : ''
+                  }`}
+                />
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                  {contractNoStatus === 'checking' && (
+                    <div className="w-3.5 h-3.5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {contractNoStatus === 'available' && (
+                    <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                  {contractNoStatus === 'taken' && (
+                    <svg className="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+              {contractNoStatus === 'taken' && (
+                <p className="text-xs text-red-500 mt-0.5">This contract number already exists.</p>
+              )}
+              {contractNoStatus === 'available' && (
+                <p className="text-xs text-green-500 mt-0.5">Contract number is available.</p>
+              )}
+            </div>
 
             {/* Supplier dropdown */}
             <div className="space-y-1.5">
@@ -341,7 +398,7 @@ export default function ContractsPage() {
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+            <button type="button" className="btn-secondary" onClick={() => { setShowModal(false); setForm(defaultForm); setContractNoStatus('idle') }}>Cancel</button>
             <button type="submit" className="btn-primary" disabled={saving}>
               {saving ? 'Creating…' : <><Plus size={14} /> Create Contract</>}
             </button>

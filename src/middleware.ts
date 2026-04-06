@@ -44,5 +44,6 @@ export const config = {
     '/settings/:path*',
     '/running-balance/:path*',
     '/amendment-log/:path*',
+    '/signatories/:path*',
   ],
 }

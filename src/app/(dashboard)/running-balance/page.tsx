@@ -120,13 +120,12 @@ export default function RunningBalancePage() {
 
       {/* Search */}
       <div className="relative max-w-sm">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
         <input
           type="text"
           placeholder="Search by contract no. or package…"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-          className="input-field pl-9"
+          className="input-field pl-11"
         />
       </div>
 

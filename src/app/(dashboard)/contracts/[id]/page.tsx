@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
   ArrowLeft, Package, ClipboardList, Plus, Edit2,
   Trash2, ChevronDown, ChevronRight, AlertTriangle, FileBarChart2, Lock, CheckCircle,
+  Paperclip, Eye, Download, X as XIcon, FileText as FileIcon,
 } from 'lucide-react'
 import {
   Badge, Modal, InputField, SelectField, ConfirmDialog, EmptyState, Skeleton,
@@ -15,6 +17,8 @@ import {
   formatDate, formatCurrency, formatNumber, getExpiryStatus, getContractTypeColor,
 } from '@/lib/utils'
 import { generatePackageReport, generateReportRows, generatePackageSummary } from '@/lib/reportGenerator'
+import { generateContractSummaryReport } from '@/lib/reportSummaryGenerator'
+import {  canCreate, canDelete } from '@/lib/permissions'
 
 // ─── constants ───────────────────────────────────────────────────────────────
 
@@ -30,7 +34,7 @@ const CONTRACT_TYPES = [
 const defaultPkgForm    = { PackageName: '' }
 const defaultDetailForm = {
   ContractType: 'ORIGINAL', FuelContractPackageId: '',
-  amendSourcePackageId: '',   // UI-only — which package's balance to pull & zero (AMENDMENT only)
+  amendSourcePackageId: '',   
   PlantID: '', PlantName: '', FuelTypeID: '',
   FunctionalGroup: '', LocationGroup: '',
   InvoiceNo: '', DeliveryDate: '',
@@ -151,7 +155,7 @@ function DetailFormFields({ form, onChange, packages, fuelTypes, plants, package
         ]}
       />
 
-      {/* ── Amend From (source package — only shown for AMENDMENT) ── */}
+      {/* ── Amend From (source package — CROSS-CONTRACT, shows all certified summaries) ── */}
       {isAmendment && (
         <div className="col-span-full space-y-1.5">
           <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
@@ -163,17 +167,16 @@ function DetailFormFields({ form, onChange, packages, fuelTypes, plants, package
             className="input-field"
           >
             <option value="">— Select source package whose balance to amend —</option>
-            {packages.map((p: any) => {
-              const s = packageSummaries.find((x: any) => String(x.FuelContractPackageId) === String(p.FuelContractPackageId))
-              const balLabel = s
-                ? ` | Bal ₱${Number(s.EndRunningBalance).toLocaleString('en-PH', { minimumFractionDigits: 2 })} / ${Number(s.EndVolumeBalance).toLocaleString('en-PH', { minimumFractionDigits: 2 })} L`
-                : ' | (no saved summary)'
-              return (
-                <option key={p.FuelContractPackageId} value={String(p.FuelContractPackageId)}>
-                  {p.PackageName}{balLabel}
-                </option>
-              )
-            })}
+            {packageSummaries
+              .map((s: any) => {
+                const balLabel = ` | ₱${Number(s.EndRunningBalance).toLocaleString('en-PH', { minimumFractionDigits: 2 })} / ${Number(s.EndVolumeBalance).toLocaleString('en-PH', { minimumFractionDigits: 2 })} L`
+                return (
+                  <option key={s.FuelContractPackageId} value={String(s.FuelContractPackageId)}>
+                    [{s.ContractNo}] {s.PackageName}
+                  </option>
+                )
+              })
+            }
           </select>
 
           {/* Info card — only when a source package is selected */}
@@ -186,22 +189,6 @@ function DetailFormFields({ form, onChange, packages, fuelTypes, plants, package
                 </p>
               )
             }
-            return (
-              <div className="mt-1.5 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs space-y-1">
-                <p className="font-600 text-amber-700 dark:text-amber-400">
-                  Auto-populated from <span className="underline">{s.PackageName}</span> ending balance:
-                </p>
-                <p className="text-amber-600 dark:text-amber-500">
-                  Contract Price → <span className="font-mono font-600">₱{Number(s.EndRunningBalance).toLocaleString('en-PH', { minimumFractionDigits: 4 })}</span>
-                </p>
-                <p className="text-amber-600 dark:text-amber-500">
-                  Volume Ordered → <span className="font-mono font-600">{Number(s.EndVolumeBalance).toLocaleString('en-PH', { minimumFractionDigits: 4 })} L</span>
-                </p>
-                <p className="text-amber-700 dark:text-amber-400 font-600 pt-0.5 border-t border-amber-200 dark:border-amber-700">
-                  ⚠ Saving will reset <span className="underline">{s.PackageName}</span>'s running balance to 0.
-                </p>
-              </div>
-            )
           })()}
         </div>
       )}
@@ -281,18 +268,15 @@ function DetailFormFields({ form, onChange, packages, fuelTypes, plants, package
       {/* Contract Price — read-only when auto-populated via Amendment */}
       <div className="space-y-1.5">
         <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
-          Contract Price/Fuel Price (₱/L)
-          {isAmendment && form.amendSourcePackageId && (
-            <span className="ml-2 text-amber-500 font-400 normal-case">(from source ending balance)</span>
-          )}
+          Contract Price/Fuel Price  (₱/L)
         </label>
         <input
           type="number"
           value={form.ContractPrice}
           onChange={(e) => onChange({ ...form, ContractPrice: e.target.value })}
           placeholder="0.0000"
-          readOnly={isAmendment && !!form.amendSourcePackageId}
-          className={`input-field ${isAmendment && form.amendSourcePackageId ? 'bg-amber-50 dark:bg-amber-950/20 cursor-not-allowed' : ''}`}
+          // readOnly={isAmendment && !!form.amendSourcePackageId}
+          className={`input-field ${isAmendment && form.amendSourcePackageId ? 'bg-amber-50 dark:bg-amber-950/20 ' : ''}`}
         />
       </div>
 
@@ -303,17 +287,14 @@ function DetailFormFields({ form, onChange, packages, fuelTypes, plants, package
       <div className="space-y-1.5">
         <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
           Volume Ordered (L)
-          {isAmendment && form.amendSourcePackageId && (
-            <span className="ml-2 text-amber-500 font-400 normal-case">(from source ending balance)</span>
-          )}
         </label>
         <input
           type="number"
           value={form.VolumeOrdered}
           onChange={(e) => onChange({ ...form, VolumeOrdered: e.target.value })}
           placeholder="0.00"
-          readOnly={isAmendment && !!form.amendSourcePackageId}
-          className={`input-field ${isAmendment && form.amendSourcePackageId ? 'bg-amber-50 dark:bg-amber-950/20 cursor-not-allowed' : ''}`}
+          // readOnly={isAmendment && !!form.amendSourcePackageId} cursor-not-allowed
+          className={`input-field ${isAmendment && form.amendSourcePackageId ? 'bg-amber-50 dark:bg-amber-950/20 ' : ''}`}
         />
       </div>
 
@@ -338,6 +319,7 @@ function DetailFormFields({ form, onChange, packages, fuelTypes, plants, package
 export default function ContractDetailPage() {
   const { id }   = useParams()
   const router   = useRouter()
+  const { data: session } = useSession()
   const { success, error: toastError } = useToast()
 
   const [contract,    setContract]    = useState<any>(null)
@@ -346,6 +328,11 @@ export default function ContractDetailPage() {
   const [savingReport,  setSavingReport]  = useState<number | null>(null) // packageId
   const [certifyingPkg, setCertifyingPkg] = useState<number | null>(null)
   const [certifyConfirmPkg, setCertifyConfirmPkg] = useState<any>(null)
+  const [documents,   setDocuments]   = useState<any[]>([])
+  const [docsLoading, setDocsLoading] = useState(false)
+  const [uploadingDoc, setUploadingDoc] = useState(false)
+  const [docViewModal, setDocViewModal] = useState(false)
+  const [docViewData,  setDocViewData]  = useState<any>(null)
 
   // Lookup data
   const [fuelTypes,        setFuelTypes]        = useState<any[]>([])
@@ -382,6 +369,11 @@ export default function ContractDetailPage() {
   // Delete Contract confirm
   const [deleteConfirm, setDeleteConfirm] = useState(false)
 
+  //Delete Document confirm
+  const [deleteDocConfirm, setDeleteDocConfirm] = useState(false)
+  const [deleteDocId,      setDeleteDocId]      = useState<number | null>(null)
+  const [deleteDocName,    setDeleteDocName]    = useState('')
+
   // ── Lookups ───────────────────────────────────────────────────────────────
   useEffect(() => {
     Promise.all([
@@ -395,14 +387,24 @@ export default function ContractDetailPage() {
     })
   }, [])
 
-  // Load package summaries for this contract (used by Amendment auto-populate)
+  // Load ALL package summaries across all contracts (cross-contract amendment support)
   const loadPackageSummaries = useCallback(async () => {
-    const res  = await fetch(`/api/package-summary?contractId=${id}`)
+    const res  = await fetch('/api/package-summary')
     const data = await res.json()
     setPackageSummaries(Array.isArray(data) ? data : [])
-  }, [id])
+  }, [])
 
   useEffect(() => { loadPackageSummaries() }, [loadPackageSummaries])
+
+  const loadDocuments = useCallback(async () => {
+    setDocsLoading(true)
+    const res  = await fetch(`/api/contracts/${id}/documents`)
+    const data = await res.json()
+    setDocuments(Array.isArray(data) ? data : [])
+    setDocsLoading(false)
+  }, [id])
+
+  useEffect(() => { loadDocuments() }, [loadDocuments])
 
   // ── Load contract ─────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -465,10 +467,13 @@ export default function ContractDetailPage() {
     if (res.ok) {
       // If AMENDMENT with a source package: zero out source balance + log the transfer
       if (detailForm.ContractType === 'AMENDMENT' && amendSourcePackageId) {
-        // Find source and destination package names for the log
-        const srcPkg  = contract?.packages?.find((p: any) => String(p.FuelContractPackageId) === amendSourcePackageId)
-        const destPkg = contract?.packages?.find((p: any) => String(p.FuelContractPackageId) === detailForm.FuelContractPackageId)
+        // Source may be from a different contract — look up in packageSummaries (all contracts)
         const srcSummary = packageSummaries.find((s: any) => String(s.FuelContractPackageId) === amendSourcePackageId)
+        const srcPkg     = contract?.packages?.find((p: any) => String(p.FuelContractPackageId) === amendSourcePackageId)
+        const destPkg    = contract?.packages?.find((p: any) => String(p.FuelContractPackageId) === detailForm.FuelContractPackageId)
+
+        // Source contract info (may differ from current contract)
+        const srcContractNo = srcSummary?.ContractNo || contract.ContractNo
 
         await Promise.all([
           // Zero out the source package running balance
@@ -485,7 +490,8 @@ export default function ContractDetailPage() {
               FuelContractID:         contract.FuelContractID,
               ContractNo:             contract.ContractNo,
               SourcePackageId:        amendSourcePackageId,
-              SourcePackageName:      srcPkg?.PackageName || `Package #${amendSourcePackageId}`,
+              SourcePackageName:      srcSummary?.PackageName || srcPkg?.PackageName || `Package #${amendSourcePackageId}`,
+              SourceContractNo:       srcContractNo,
               DestinationPackageId:   detailForm.FuelContractPackageId,
               DestinationPackageName: destPkg?.PackageName || `Package #${detailForm.FuelContractPackageId}`,
               AmendedAmount:          srcSummary?.EndRunningBalance ?? null,
@@ -511,7 +517,7 @@ export default function ContractDetailPage() {
       ContractType:          d.ContractType          || 'ORIGINAL',
       FuelContractPackageId: d.FuelContractPackageId != null ? String(d.FuelContractPackageId) : '',
       amendSourcePackageId:  '',
-      PlantID:               d.PlantID    != null    ? String(d.PlantID)    : '',
+        PlantID:               d.PlantID    != null    ? String(d.PlantID)    : '',
       PlantName:             d.PlantName             || '',
       FuelTypeID:            d.FuelTypeID != null    ? String(d.FuelTypeID) : '',
       FunctionalGroup:       d.FunctionalGroup       || '',
@@ -582,7 +588,7 @@ export default function ContractDetailPage() {
   }
 
   const handleDelete = async () => {
-    const res = await fetch(`/api/contracts/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/details/contract-packages/${id}`, { method: 'DELETE' })
     if (res.ok) {
       success('Contract deleted')
       router.push('/contracts')
@@ -614,7 +620,86 @@ export default function ContractDetailPage() {
     }
   }
 
+  // ── Document handlers (filesystem storage) ───────────────────────────────
+
+  const handleUploadDocuments = async (files: FileList) => {
+    setUploadingDoc(true)
+    const uploads = Array.from(files)
+    let successCount = 0
+    for (const file of uploads) {
+      const MAX = 50 * 1024 * 1024
+      if (file.size > MAX) {
+        toastError(`${file.name} exceeds 50 MB`, 'Skipped')
+        continue
+      }
+      // Use multipart FormData — file is saved to disk on the server
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch(`/api/contracts/${id}/documents`, {
+        method: 'POST',
+        body:   fd,   // no Content-Type header — browser sets multipart boundary
+      })
+      if (res.ok) successCount++
+      else toastError(`Failed to upload ${file.name}`)
+    }
+    setUploadingDoc(false)
+    if (successCount > 0) {
+      success('Uploaded', `${successCount} document${successCount > 1 ? 's' : ''} attached`)
+      loadDocuments()
+    }
+  }
+
+  const openDeleteDocument = (d: any) => {
+    setDeleteDocId(d.DocumentID)
+    setDeleteDocName(d.FileName)
+    setDeleteDocConfirm(true)
+  }
+
+  const handleDeleteDocument = async () => {
+    if (!deleteDocId) return
+
+  const res = await fetch(`/api/contracts/${id}/documents/${deleteDocId}`, { method: 'DELETE' })
+  if (res.ok) {
+    success('Document deleted', deleteDocName)
+    loadDocuments()
+  } else {
+    toastError('Failed to delete document')
+  }
+
+  }
+
+
+  // View: open the static file URL directly in a modal (PDF/image) or new tab
+  const handleViewDocument = (doc: any) => {
+    setDocViewData(doc)
+    setDocViewModal(true)
+  }
+
+  const openDocInTab = (doc: any) => {
+    if (!doc?.FilePath) return
+    window.open(doc.FilePath, '_blank')
+  }
+
+  const downloadDoc = (doc: any) => {
+    if (!doc?.FilePath) return
+    const a    = document.createElement('a')
+    a.href     = doc.FilePath
+    a.download = doc.FileName
+    a.click()
+  }
+
   const handleGenerateReport = async (pkg: any) => {
+
+    let signatories = null
+    try {
+      const sigRes  = await fetch(`/api/signatories?contractId=${contract.FuelContractID}`)
+      const sigData = await sigRes.json()
+      // Prefer contract-specific, fall back to first available
+      signatories = Array.isArray(sigData) && sigData.length > 0 ? sigData[0] : null
+
+      console.log('Fetched signatories:', contract.FuelContractID)
+    } catch { toastError('Something went wrong fetching signatories.') }
+
     const contractArg = {
       ContractNo:      contract.ContractNo,
       FuelContractID:  contract.FuelContractID,
@@ -624,12 +709,14 @@ export default function ContractDetailPage() {
       ExpiredDate:     contract.ExpiredDate,
       SupplierID:      contract.SupplierID,
       isMiniGrid:      contract.isMiniGrid === true,
+      signatories,
     }
     const pkgArg = {
       FuelContractPackageId: pkg.FuelContractPackageId,
       PackageName:           pkg.PackageName,
       details:               pkg.details || [],
     }
+    
 
     // Open HTML report in new tab
     const html = generatePackageReport(contractArg, pkgArg)
@@ -655,33 +742,70 @@ export default function ContractDetailPage() {
       const rowsData = await rowsRes.json()
 
       // Only save package summary when the package is certified
-      if (pkg.isCertified) {
-        const summary = generatePackageSummary(contractArg, pkgArg)
-        const summaryRes = await fetch('/api/package-summary', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ summary }),
-        })
-        if (summaryRes.ok) {
-          const summaryData = await summaryRes.json()
-          if (summaryData.skipped) {
-            success('Report saved', `${rowsData.saved} rows recorded — summary preserved (already certified)`)
-          } else {
-            success('Report saved', `${rowsData.saved} rows + certified summary recorded`)
-            await loadPackageSummaries()
-          }
+      // if (pkg.isCertified) {
+      const summary = generatePackageSummary(contractArg, pkgArg)
+      const summaryRes = await fetch('/api/package-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summary }),
+      })
+      if (summaryRes.ok) {
+        const summaryData = await summaryRes.json()
+        if (summaryData.skipped) {
+          success('Report saved', `${rowsData.saved} rows recorded`)
         } else {
-          success('Report saved', `${rowsData.saved} rows recorded (summary save failed)`)
+          success('Report saved', `${rowsData.saved} rows recorded`)
+          await loadPackageSummaries()
         }
       } else {
-        success('Report saved', `${rowsData.saved} rows recorded — certify package to save summary`)
+        success('Report saved', `${rowsData.saved} rows recorded (summary save failed)`)
       }
+      // } else {
+      //   success('Report saved', `${rowsData.saved} rows recorded — certify package to save summary`)
+      // }
     } catch {
       toastError('Report opened but save failed')
     } finally {
       setSavingReport(null)
     }
   }
+
+  const handleGenerateSummaryReport = async () => {
+  if (!contract?.packages?.length) {
+    toastError('No packages', 'This contract has no packages to summarize.')
+    return
+  }
+  let signatories = null
+    try {
+      const sigRes  = await fetch(`/api/signatories?contractId=${contract.FuelContractID}`)
+      const sigData = await sigRes.json()
+      signatories = Array.isArray(sigData) && sigData.length > 0 ? sigData[0] : null
+
+  } catch { toastError('Something went wrong fetching signatories.') }
+  const contractArg = {
+    ContractNo:      contract.ContractNo,
+    FuelContractID:  contract.FuelContractID,
+    Representative:  contract.Representative,
+    EffectivityFrom: contract.EffectivityFrom,
+    EffectivityTo:   contract.EffectivityTo,
+    ExpiredDate:     contract.ExpiredDate,
+    SupplierID:      contract.SupplierID,
+    isMiniGrid:      contract.isMiniGrid === true,
+    signatories,
+  }
+  const packagesArg = contract.packages.map((pkg: any) => ({
+    FuelContractPackageId: pkg.FuelContractPackageId,
+    PackageName:           pkg.PackageName,
+    details:               pkg.details || [],
+    isCertified:           pkg.isCertified,
+    CertifiedAt:           pkg.CertifiedAt,
+  }))
+  const html = generateContractSummaryReport(contractArg, packagesArg)
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url  = URL.createObjectURL(blob)
+  const win  = window.open(url, '_blank')
+  if (win) win.addEventListener('load', () => URL.revokeObjectURL(url), { once: true })
+}
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const fuelLabel = (fid: any) => {
@@ -699,7 +823,7 @@ export default function ContractDetailPage() {
   if (loading) return <ContractDetailSkeleton />
   if (!contract) return (
     <div className="text-center py-20">
-      <p className="text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-4 py-3 rounded-lg">Contract not found.</p>
+      <p className="text-[var(--text-muted)]">Contract not found.</p>
       <Link href="/contracts" className="btn-primary mt-4 inline-flex">← Back</Link>
     </div>
   )
@@ -738,6 +862,13 @@ export default function ContractDetailPage() {
         </div>
         {expiryStatus !== 'expired' && (
         <div className="flex items-center gap-2">
+          <button
+              onClick={handleGenerateSummaryReport}
+              className="btn-secondary flex items-center gap-1.5"
+              title="Generate summary report for all packages"
+            >
+              <FileBarChart2 size={14} /> Summary Report
+          </button>
           <button onClick={() => setEditModal(true)} className="btn-secondary">
             <Edit2 size={14} /> Edit
           </button>
@@ -778,7 +909,7 @@ export default function ContractDetailPage() {
                 Mini-Grid
               </span>
             ) : (
-              <p className="text-sm font-500 text-[var(--text-muted)]">No</p>
+              <p className="text-sm font-500 text-[var(--text-muted)]">—</p>
             )}
           </div>
         </div>
@@ -813,18 +944,18 @@ export default function ContractDetailPage() {
             <span className="text-sm font-400 text-[var(--text-muted)]">({contract.packages?.length ?? 0})</span>
           </h2>
           {expiryStatus !== 'expired' && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setDetailForm({ ...defaultDetailForm }); setDetailModal(true) }}
-                className="btn-secondary text-xs"
-              >
-                <ClipboardList size={13} /> Add Detail
-              </button>
-              <button onClick={() => setPkgModal(true)} className="btn-primary text-xs">
-                <Plus size={13} /> Add Package
-              </button>
-            </div>
-          )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setDetailForm({ ...defaultDetailForm }); setDetailModal(true) }}
+              className="btn-secondary text-xs"
+            >
+              <ClipboardList size={13} /> Add Detail
+            </button>
+            <button onClick={() => setPkgModal(true)} className="btn-primary text-xs">
+              <Plus size={13} /> Add Package
+            </button>
+          </div>
+            )}
         </div>
 
         {(!contract.packages || contract.packages.length === 0) ? (
@@ -871,23 +1002,23 @@ export default function ContractDetailPage() {
 
                   {/* Action buttons */}
                   <div className="flex items-center gap-2 mx-3 flex-shrink-0">
-                  {/* Certify button — only shown when not yet certified */}
+                    {/* Certify button — only shown when not yet certified */}
                     {expiryStatus !== 'expired' && (
-                      !pkg.isCertified ? (
-                        <button
-                          onClick={() => handleCertifyPackage(pkg)}
-                          disabled={certifyingPkg === pkg.FuelContractPackageId}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-500 transition-all whitespace-nowrap shadow-sm disabled:opacity-60 disabled:cursor-wait"
-                          title="Certify this package — locks all details"
-                        >
-                          <Lock size={13} />
-                          {certifyingPkg === pkg.FuelContractPackageId ? 'Certifying…' : 'Certify'}
-                        </button>
-                      ) : (
-                        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-600 whitespace-nowrap border border-green-200 dark:border-green-800">
-                          <CheckCircle size={13} /> Certified
-                        </span>
-                      )
+                    !pkg.isCertified ? (
+                      <button
+                        onClick={() => handleCertifyPackage(pkg)}
+                        disabled={certifyingPkg === pkg.FuelContractPackageId}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-500 transition-all whitespace-nowrap shadow-sm disabled:opacity-60 disabled:cursor-wait"
+                        title="Certify this package — locks all details"
+                      >
+                        <Lock size={13} />
+                        {certifyingPkg === pkg.FuelContractPackageId ? 'Certifying…' : 'Certify'}
+                      </button>
+                    ) : (
+                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-600 whitespace-nowrap border border-green-200 dark:border-green-800">
+                        <CheckCircle size={13} /> Certified
+                      </span>
+                    )
                     )}
                     <button
                       onClick={() => handleGenerateReport(pkg)}
@@ -981,21 +1112,20 @@ export default function ContractDetailPage() {
                                       </span>
                                     ) : (
                                       <>
-                                        <button
-                                          onClick={() => openEditDetail(d)}
-                                          className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-brand-500 transition-colors"
-                                          title="Edit"
-                                        >
-                                          <Edit2 size={13} />
-                                        </button>
-
-                                        <button
-                                          onClick={() => openDeleteDetail(d)}
-                                          className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-[var(--text-muted)] hover:text-red-500 transition-colors"
-                                          title="Delete"
-                                        >
-                                          <Trash2 size={13} />
-                                        </button>
+                                    <button
+                                      onClick={() => openEditDetail(d)}
+                                      className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-brand-500 transition-colors"
+                                      title="Edit"
+                                    >
+                                      <Edit2 size={13} />
+                                    </button>
+                                    <button
+                                      onClick={() => openDeleteDetail(d)}
+                                      className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-[var(--text-muted)] hover:text-red-500 transition-colors"
+                                      title="Delete"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
                                       </>
                                     )}
                                   </div>
@@ -1013,6 +1143,106 @@ export default function ContractDetailPage() {
           </div>
         )}
       </div>
+
+
+      {/* ══════════════ DOCUMENTS SECTION ══════════════ */}
+      <div className="w-full card overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+          <h2 className="font-display font-600 text-[var(--text-primary)] flex items-center gap-2">
+            <Paperclip size={16} /> Fuel Contract Attachments
+            <span className="text-sm font-400 text-[var(--text-muted)]">({documents.length})</span>
+          </h2>
+          {canCreate(session?.user?.accessLevel ?? 1) && (
+            <label className={`btn-secondary text-xs cursor-pointer flex items-center gap-1.5 ${uploadingDoc ? 'opacity-60 pointer-events-none' : ''}`}>
+              <Plus size={13} />
+              {uploadingDoc ? 'Uploading…' : 'Attach Files'}
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.ppt,.pptx,.txt,.csv"
+                className="sr-only"
+                onChange={(e) => e.target.files && handleUploadDocuments(e.target.files)}
+                disabled={uploadingDoc}
+              />
+            </label>
+          )}
+        </div>
+
+        {docsLoading ? (
+          <div className="p-4 space-y-2">
+            {[1,2,3].map(i => (
+              <div key={i} className="h-10 rounded bg-[var(--bg-tertiary)] animate-pulse" />
+            ))}
+          </div>
+        ) : documents.length === 0 ? (
+          <div className="p-8 text-center text-sm text-[var(--text-muted)]">
+            No documents attached yet. Click "Attach Files" to upload.
+          </div>
+        ) : (
+          <ul className="divide-y divide-[var(--border)]">
+            {documents.map((doc: any) => {
+              const isImage = doc.FileType?.startsWith('image/')
+              const isPDF   = doc.FileType === 'application/pdf'
+              const sizeKB  = doc.FileSizeBytes ? (doc.FileSizeBytes / 1024).toFixed(1) : null
+              return (
+                <li key={doc.DocumentID} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-tertiary)] transition-colors group">
+                  <FileIcon size={16} className="flex-shrink-0 text-[var(--text-muted)]" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-500 text-[var(--text-primary)] truncate">{doc.FileName}</p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {doc.FileType || 'Unknown type'}
+                      {sizeKB ? ` · ${sizeKB} KB` : ''}
+                      {` · ${formatDate(doc.UploadedAt)}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    {(isImage || isPDF) && (
+                      <button
+                        onClick={() => handleViewDocument(doc)}
+                        className="p-1.5 rounded hover:bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-brand-500 transition-colors"
+                        title="View"
+                      >
+                        <Eye size={14} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => downloadDoc(doc)}
+                      className="p-1.5 rounded hover:bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-brand-500 transition-colors"
+                      title="Download"
+                    >
+                      <Download size={14} />
+                    </button>
+                    {canDelete(session?.user?.accessLevel ?? 1) && (
+
+                      <button
+                        onClick={() => {
+                          openDeleteDocument(doc)
+                        }}
+                        className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-[var(--text-muted)] hover:text-red-500 transition-colors"
+                        title="Delete"
+                      >
+                        <XIcon size={14} />
+                      </button>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      {/* Delete Document */}
+      <ConfirmDialog
+        open={deleteDocConfirm}
+        onClose={() => setDeleteDocConfirm(false)}
+        onConfirm={() => handleDeleteDocument()}
+        title="Delete Document"
+        description={`Are you sure you want to delete "${deleteDocName}"? This cannot be undone.`}
+        confirmLabel="Delete Document"
+        danger
+      />
+
 
       {/* ══════════════ MODALS ══════════════ */}
 
@@ -1080,6 +1310,49 @@ export default function ContractDetailPage() {
         confirmLabel="Delete Detail"
         danger
       />
+
+      {/* Document View Modal */}
+      <Modal open={docViewModal} onClose={() => { setDocViewModal(false); setDocViewData(null) }} title={docViewData?.FileName || 'Document'} size="xl">
+        <div className="space-y-3">
+          {docViewData ? (
+            <>
+              <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mb-2">
+                <span>{docViewData.FileType}</span>
+                {docViewData.FileSizeBytes && <span>· {(docViewData.FileSizeBytes / 1024).toFixed(1)} KB</span>}
+              </div>
+              {docViewData.FileType?.startsWith('image/') ? (
+                <img
+                  src={docViewData.FilePath}
+                  alt={docViewData.FileName}
+                  className="max-w-full rounded-lg border border-[var(--border)]"
+                />
+              ) : docViewData.FileType === 'application/pdf' ? (
+                <iframe
+                  src={docViewData.FilePath}
+                  className="w-full rounded-lg border border-[var(--border)]"
+                  style={{ height: '70vh' }}
+                  title={docViewData.FileName}
+                />
+              ) : (
+                <div className="text-center py-10 space-y-3">
+                  <FileIcon size={36} className="mx-auto text-[var(--text-muted)]" />
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Preview not available — use Download or Open in Tab.
+                  </p>
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-3">
+                <button onClick={() => openDocInTab(docViewData)} className="btn-secondary text-xs flex items-center gap-1.5">
+                  <Eye size={13} /> Open in Tab
+                </button>
+                <button onClick={() => downloadDoc(docViewData)} className="btn-primary text-xs flex items-center gap-1.5">
+                  <Download size={13} /> Download
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </Modal>
 
       {/* Certify Package confirm */}
       <ConfirmDialog

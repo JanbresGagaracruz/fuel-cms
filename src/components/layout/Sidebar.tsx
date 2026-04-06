@@ -18,6 +18,7 @@ import {
   Fuel,
   BarChart2,
   ArrowLeftRight,
+  Users2
 } from 'lucide-react'
 import Image from 'next/image'
 
@@ -26,7 +27,7 @@ const navItems = [
     label: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
-    description: 'Overview & metrics',
+    description: 'Overview',
     minLevel: 4,   // Super Admin only
   },
   {
@@ -34,14 +35,14 @@ const navItems = [
     href: '/contracts',
     icon: FileText,
     description: 'Manage contracts',
-    minLevel: 1,
+    minLevel: 2,
   },
   {
     label: 'Packages',
     href: '/packages',
     icon: Package,
     description: 'Contract packages',
-    minLevel: 1,
+    minLevel: 2,
   },
   {
     label: 'Running Balance',
@@ -62,7 +63,7 @@ const navItems = [
     href: '/details',
     icon: ClipboardList,
     description: 'Delivery details',
-    minLevel: 1,
+    minLevel: 2,
   },
   {
     label: 'Activity Log',
@@ -70,6 +71,13 @@ const navItems = [
     icon: Activity,
     description: 'Trail & history',
     minLevel: 4,
+  },
+  {
+    label:    'Signatories',
+    href:     '/signatories',
+    icon:     Users2,
+    description: 'Report signatories',
+    minLevel: 2,
   },
 ]
  

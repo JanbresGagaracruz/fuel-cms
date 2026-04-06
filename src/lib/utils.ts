@@ -51,7 +51,7 @@ export function getContractTypeColor(type: string | null) {
     case 'AMENDMENT': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
     case 'RENEWAL':   return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
     case 'ADDENDUM':  return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-    case 'CLOSING':   return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+    case 'CLOSING':   return 'bg-red-100 text-red-500 dark:bg-red-900/30 dark:text-red-400'
     default:          return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
   }
 }

@@ -38,3 +38,8 @@ next-env.d.ts
 
 # prisma
 prisma/generated/
+
+# Uploaded contract documents (keep folder structure, ignore files)
+public/uploads/contracts/
+!public/uploads/contracts/.gitkeep
+!public/uploads/.gitkeep
