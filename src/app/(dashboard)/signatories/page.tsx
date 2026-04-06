@@ -5,6 +5,7 @@ import { Plus, RefreshCw, Edit2, Trash2, Users2 } from 'lucide-react'
 import { SectionHeader, Modal, InputField, EmptyState } from '@/components/ui/index'
 import { useToast } from '@/components/ui/Toast'
 import { formatDate } from '@/lib/utils'
+import Link from 'next/link'
 
 const defaultForm = {
   FuelContractID: '', Title: '',
@@ -151,7 +152,14 @@ export default function SignatoriesPage() {
               <tbody>
                 {signatories.map((s: any) => (
                   <tr key={s.SignatoryID}>
-                    <td className="text-sm font-500 text-brand-500">{contractLabel(s.FuelContractID)}</td>
+                    <td>
+                      <Link
+                        href={`/contracts/${s.FuelContractID}`}
+                        className="font-500 text-brand-500 hover:text-brand-400 transition-colors text-sm"
+                      >
+                        {contractLabel(s.FuelContractID)}
+                      </Link>
+                    </td>
                     <td className="text-sm text-[var(--text-secondary)]">{s.Title || '—'}</td>
                     <td>
                       <p className="text-xs font-500">{s.PreparedByName || '—'}</p>
