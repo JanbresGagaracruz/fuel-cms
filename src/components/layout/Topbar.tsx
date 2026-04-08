@@ -42,7 +42,28 @@ export function Topbar({ onMenuToggle, isSidebarCollapsed }: TopbarProps) {
   const [showProfile, setShowProfile] = useState(false)
 
   const segments = pathname.split('/').filter(Boolean)
-  const currentLabel = routeLabels[`/${segments[0]}`] || 'Page'
+
+  const breadcrumbs = segments.map((segment, index) => {
+    const path = '/' + segments.slice(0, index + 1).join('/')
+
+    if (!isNaN(Number(segment))) {
+      return {
+        label: `${segment}`,
+        isLast: index === segments.length - 1,
+      }
+    }
+
+    const exactMatch = routeLabels[path]
+    const baseMatch = routeLabels[`/${segment}`]
+
+    return {
+      label:
+        exactMatch ||
+        baseMatch ||
+        segment.replace(/-/g, ' '),
+      isLast: index === segments.length - 1,
+    }
+  })
 
   return (
     <header className="topbar sticky top-0 z-30 flex items-center justify-between h-14 px-4 lg:px-6 flex-shrink-0">
@@ -55,15 +76,24 @@ export function Topbar({ onMenuToggle, isSidebarCollapsed }: TopbarProps) {
           <Menu size={18} />
         </button>
         <nav className="flex items-center gap-1 text-sm">
-          <span className="text-[var(--text-muted)] hidden sm:inline">FuelContract</span>
-          <ChevronRight size={14} className="text-[var(--text-muted)] hidden sm:inline" />
-          <span className="font-500 text-[var(--text-primary)]">{currentLabel}</span>
-          {segments[1] && (
-            <>
+          <span className="text-[var(--text-muted)] hidden sm:inline">
+            FuelContract
+          </span>
+
+          {breadcrumbs.map((crumb, idx) => (
+            <span key={idx} className="flex items-center gap-1">
               <ChevronRight size={14} className="text-[var(--text-muted)]" />
-              <span className="text-[var(--text-secondary)] capitalize">{segments[1]}</span>
-            </>
-          )}
+              <span
+                className={`capitalize ${
+                  crumb.isLast
+                    ? 'font-500 text-[var(--text-primary)]'
+                    : 'text-[var(--text-secondary)]'
+                }`}
+              >
+                {crumb.label}
+              </span>
+            </span>
+          ))}
         </nav>
       </div>
 
