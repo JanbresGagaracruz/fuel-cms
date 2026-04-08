@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logActivity, ACTIONS, MODULES } from '@/lib/activity'
 import { canCreate } from '@/lib/permissions'
+import { de } from 'date-fns/locale'
+import { TheaterIcon } from 'lucide-react'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)

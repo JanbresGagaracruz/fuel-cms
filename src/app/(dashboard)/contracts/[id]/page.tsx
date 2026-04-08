@@ -8,6 +8,8 @@ import {
   ArrowLeft, Package, ClipboardList, Plus, Edit2,
   Trash2, ChevronDown, ChevronRight, AlertTriangle, FileBarChart2, Lock, CheckCircle,
   Paperclip, Eye, Download, X as XIcon, FileText as FileIcon,
+  Pen,
+  Pencil,
 } from 'lucide-react'
 import {
   Badge, Modal, InputField, SelectField, ConfirmDialog, EmptyState, Skeleton,
@@ -19,6 +21,7 @@ import {
 import { generatePackageReport, generateReportRows, generatePackageSummary } from '@/lib/reportGenerator'
 import { generateContractSummaryReport } from '@/lib/reportSummaryGenerator'
 import {  canCreate, canDelete } from '@/lib/permissions'
+import { set } from 'date-fns'
 
 // ─── constants ───────────────────────────────────────────────────────────────
 
@@ -324,10 +327,10 @@ export default function ContractDetailPage() {
 
   const [contract,    setContract]    = useState<any>(null)
   const [loading,     setLoading]     = useState(true)
-  const [expandedPkg, setExpandedPkg] = useState<number | null>(null)
   const [savingReport,  setSavingReport]  = useState<number | null>(null) // packageId
   const [certifyingPkg, setCertifyingPkg] = useState<number | null>(null)
   const [certifyConfirmPkg, setCertifyConfirmPkg] = useState<any>(null)
+  const [deleteConfirmPkg, setDeleteConfirmPkg] = useState<any>(null)
   const [documents,   setDocuments]   = useState<any[]>([])
   const [docsLoading, setDocsLoading] = useState(false)
   const [uploadingDoc, setUploadingDoc] = useState(false)
@@ -345,21 +348,10 @@ export default function ContractDetailPage() {
   const [pkgForm,   setPkgForm]   = useState(defaultPkgForm)
   const [savingPkg, setSavingPkg] = useState(false)
 
-  // Add Detail modal
-  const [detailModal,  setDetailModal]  = useState(false)
-  const [detailForm,   setDetailForm]   = useState<DetailForm>(defaultDetailForm)
-  const [savingDetail, setSavingDetail] = useState(false)
-
-  // Edit Detail modal
-  const [editDetailModal,  setEditDetailModal]  = useState(false)
-  const [editDetailForm,   setEditDetailForm]   = useState<DetailForm>(defaultDetailForm)
-  const [editDetailId,     setEditDetailId]     = useState<number | null>(null)
-  const [savingEditDetail, setSavingEditDetail] = useState(false)
-
-  // Delete Detail confirm
-  const [deleteDetailConfirm, setDeleteDetailConfirm] = useState(false)
-  const [deleteDetailId,      setDeleteDetailId]      = useState<number | null>(null)
-  const [deleteDetailName,    setDeleteDetailName]    = useState('')
+  // Edit Package modal
+  const [editModalPackage,  setEditModalPackage]  = useState(false)
+  const [editFormPackage,   setEditFormPackage]   = useState<any>({})
+  const [savingEditPackage, setSavingEditPackage] = useState(false)
 
   // Edit Contract modal
   const [editModal,  setEditModal]  = useState(false)
@@ -413,6 +405,7 @@ export default function ContractDetailPage() {
     if (res.ok) {
       const data = await res.json()
       setContract(data)
+      console.log('Loaded contract:', data)
       setEditForm({
         ContractNo:      data.ContractNo      || '',
         SupplierID:      data.supplier.SupplierName     || '',
@@ -445,129 +438,31 @@ export default function ContractDetailPage() {
       success('Package added', pkgForm.PackageName)
       setPkgModal(false)
       setPkgForm(defaultPkgForm)
+      setEditFormPackage(defaultPkgForm)
       load()
     } else {
       toastError('Failed to add package')
     }
   }
 
-  const handleAddDetail = async (e: React.FormEvent) => {
+  const handleEditPackage = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSavingDetail(true)
-
-    // amendSourcePackageId is UI-only — strip it before sending to the API
-    const { amendSourcePackageId, ...apiPayload } = detailForm
-
-    const res = await fetch('/api/details', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...apiPayload, FuelContractID: id }),
-    })
-    setSavingDetail(false)
-    if (res.ok) {
-      // If AMENDMENT with a source package: zero out source balance + log the transfer
-      if (detailForm.ContractType === 'AMENDMENT' && amendSourcePackageId) {
-        // Source may be from a different contract — look up in packageSummaries (all contracts)
-        const srcSummary = packageSummaries.find((s: any) => String(s.FuelContractPackageId) === amendSourcePackageId)
-        const srcPkg     = contract?.packages?.find((p: any) => String(p.FuelContractPackageId) === amendSourcePackageId)
-        const destPkg    = contract?.packages?.find((p: any) => String(p.FuelContractPackageId) === detailForm.FuelContractPackageId)
-
-        // Source contract info (may differ from current contract)
-        const srcContractNo = srcSummary?.ContractNo || contract.ContractNo
-
-        await Promise.all([
-          // Zero out the source package running balance
-          fetch(`/api/package-summary/${amendSourcePackageId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ EndRunningBalance: 0, EndVolumeBalance: 0 }),
-          }),
-          // Save amendment transfer log
-          fetch('/api/amendment-log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              FuelContractID:         contract.FuelContractID,
-              ContractNo:             contract.ContractNo,
-              SourcePackageId:        amendSourcePackageId,
-              SourcePackageName:      srcSummary?.PackageName || srcPkg?.PackageName || `Package #${amendSourcePackageId}`,
-              SourceContractNo:       srcContractNo,
-              DestinationPackageId:   detailForm.FuelContractPackageId,
-              DestinationPackageName: destPkg?.PackageName || `Package #${detailForm.FuelContractPackageId}`,
-              AmendedAmount:          srcSummary?.EndRunningBalance ?? null,
-              AmendedVolume:          srcSummary?.EndVolumeBalance  ?? null,
-              InvoiceNo:              detailForm.InvoiceNo || null,
-            }),
-          }),
-        ])
-        await loadPackageSummaries()  // refresh so the next Amendment reflects the reset
-      }
-      success('Detail added', `${detailForm.ContractType} — ${detailForm.InvoiceNo || 'no invoice'}`)
-      setDetailModal(false)
-      setDetailForm(defaultDetailForm)
-      load()
-    } else {
-      toastError('Failed to add detail')
-    }
-  }
-
-  const openEditDetail = (d: any) => {
-    setEditDetailId(d.FuelContractDetailID)
-    setEditDetailForm({
-      ContractType:          d.ContractType          || 'ORIGINAL',
-      FuelContractPackageId: d.FuelContractPackageId != null ? String(d.FuelContractPackageId) : '',
-      amendSourcePackageId:  '',
-        PlantID:               d.PlantID    != null    ? String(d.PlantID)    : '',
-      PlantName:             d.PlantName             || '',
-      FuelTypeID:            d.FuelTypeID != null    ? String(d.FuelTypeID) : '',
-      FunctionalGroup:       d.FunctionalGroup       || '',
-      LocationGroup:         d.LocationGroup         || '',
-      InvoiceNo:             d.InvoiceNo             || '',
-      DeliveryDate:          d.DeliveryDate          ? d.DeliveryDate.split('T')[0] : '',
-      ContractPrice:         d.ContractPrice   != null ? String(d.ContractPrice)   : '',
-      VolumeOrdered:         d.VolumeOrdered   != null ? String(d.VolumeOrdered)   : '',
-      VolumeValidated:       d.VolumeValidated != null ? String(d.VolumeValidated) : '',
-    })
-    setEditDetailModal(true)
-  }
-
-  const handleEditDetail = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editDetailId) return
-    setSavingEditDetail(true)
-    const res = await fetch(`/api/details/${editDetailId}`, {
+    setSavingEditPackage(true)
+    const res = await fetch(`/api/packages/${editFormPackage.FuelContractPackageId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editDetailForm),
+      body: JSON.stringify({ ...editFormPackage, FuelContractID: id }),
     })
-    setSavingEditDetail(false)
+    setSavingEditPackage(false)
     if (res.ok) {
-      success('Detail updated', editDetailForm.InvoiceNo || `Detail #${editDetailId}`)
-      setEditDetailModal(false)
-      setEditDetailId(null)
+      success('Package updated', editFormPackage.PackageName)
+      setEditFormPackage(defaultPkgForm)
       load()
     } else {
-      toastError('Failed to update detail')
+      toastError('Failed to update package')
     }
   }
 
-  const openDeleteDetail = (d: any) => {
-    setDeleteDetailId(d.FuelContractDetailID)
-    setDeleteDetailName(d.InvoiceNo || `Detail #${d.FuelContractDetailID}`)
-    setDeleteDetailConfirm(true)
-  }
-
-  const handleDeleteDetail = async () => {
-    if (!deleteDetailId) return
-    const res = await fetch(`/api/details/${deleteDetailId}`, { method: 'DELETE' })
-    if (res.ok) {
-      success('Detail deleted', deleteDetailName)
-    } else {
-      toastError('Failed to delete detail')
-    }
-    setDeleteDetailId(null)
-    load()
-  }
 
   const handleEditContract = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -620,6 +515,23 @@ export default function ContractDetailPage() {
     }
   }
 
+  const handleDeletePackage = (pkg: any) => {
+    setDeleteConfirmPkg(pkg)
+  }
+
+  const handleDeletePackageConfirm = async () => {
+    const pkg = deleteConfirmPkg
+    if (!pkg) return
+    setDeleteConfirmPkg(null)
+    const res = await fetch(`/api/packages/${pkg.FuelContractPackageId}`, { method: 'DELETE' })
+    if (res.ok) {
+      success('Package deleted', pkg.PackageName)
+      load()
+    } else {
+      toastError('Failed to delete package')
+    }
+  }
+
   // ── Document handlers (filesystem storage) ───────────────────────────────
 
   const handleUploadDocuments = async (files: FileList) => {
@@ -632,12 +544,11 @@ export default function ContractDetailPage() {
         toastError(`${file.name} exceeds 50 MB`, 'Skipped')
         continue
       }
-      // Use multipart FormData — file is saved to disk on the server
       const fd = new FormData()
       fd.append('file', file)
       const res = await fetch(`/api/contracts/${id}/documents`, {
         method: 'POST',
-        body:   fd,   // no Content-Type header — browser sets multipart boundary
+        body:   fd,  
       })
       if (res.ok) successCount++
       else toastError(`Failed to upload ${file.name}`)
@@ -694,7 +605,7 @@ export default function ContractDetailPage() {
     try {
       const sigRes  = await fetch(`/api/signatories?contractId=${contract.FuelContractID}`)
       const sigData = await sigRes.json()
-      // Prefer contract-specific, fall back to first available
+
       signatories = Array.isArray(sigData) && sigData.length > 0 ? sigData[0] : null
 
       console.log('Fetched signatories:', contract.FuelContractID)
@@ -717,15 +628,12 @@ export default function ContractDetailPage() {
       details:               pkg.details || [],
     }
     
-
-    // Open HTML report in new tab
     const html = generatePackageReport(contractArg, pkgArg)
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
     const url  = URL.createObjectURL(blob)
     const win  = window.open(url, '_blank')
     if (win) win.addEventListener('load', () => URL.revokeObjectURL(url), { once: true })
 
-    // Save rows to rpt_fcms (always) + package summary (only if certified)
     setSavingReport(pkg.FuelContractPackageId)
     try {
       const rows = generateReportRows(contractArg, pkgArg)
@@ -741,8 +649,6 @@ export default function ContractDetailPage() {
       }
       const rowsData = await rowsRes.json()
 
-      // Only save package summary when the package is certified
-      // if (pkg.isCertified) {
       const summary = generatePackageSummary(contractArg, pkgArg)
       const summaryRes = await fetch('/api/package-summary', {
         method: 'POST',
@@ -752,17 +658,15 @@ export default function ContractDetailPage() {
       if (summaryRes.ok) {
         const summaryData = await summaryRes.json()
         if (summaryData.skipped) {
-          success('Report saved', `${rowsData.saved} rows recorded`)
+          success('Report saved', `${rowsData.saved} rows recorded `)
         } else {
-          success('Report saved', `${rowsData.saved} rows recorded`)
+          success('Report saved', `${rowsData.saved} rows recorded and package sumamry updated.`)
           await loadPackageSummaries()
         }
       } else {
         success('Report saved', `${rowsData.saved} rows recorded (summary save failed)`)
       }
-      // } else {
-      //   success('Report saved', `${rowsData.saved} rows recorded — certify package to save summary`)
-      // }
+
     } catch {
       toastError('Report opened but save failed')
     } finally {
@@ -807,19 +711,7 @@ export default function ContractDetailPage() {
   if (win) win.addEventListener('load', () => URL.revokeObjectURL(url), { once: true })
 }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  const fuelLabel = (fid: any) => {
-    if (!fid) return '—'
-    const f = fuelTypes.find((x: any) => String(x.FuelTypeID) === String(fid))
-    return f ? `${f.Type}${f.Fuel ? ` — ${f.Fuel}` : ''}` : `#${fid}`
-  }
-  const plantLabel = (pid: any) => {
-    if (!pid) return '—'
-    const p = plants.find((x: any) => String(x.PlantID) === String(pid))
-    return p ? p.PlantName : `#${pid}`
-  }
 
-  // ── Early returns ─────────────────────────────────────────────────────────
   if (loading) return <ContractDetailSkeleton />
   if (!contract) return (
     <div className="text-center py-20">
@@ -830,7 +722,6 @@ export default function ContractDetailPage() {
 
   const expiryStatus = getExpiryStatus(contract.ExpiredDate)
 
-  // ── Compute totals for summary strip (RUNNING rows only) ─────────────────
   const details  = contract.details || []
   const running  = details.filter((d: any) => (d.ContractType ?? '').toUpperCase() === 'RUNNING')
   const totalVol = running.reduce((s: number, d: any) => s + Number(d.VolumeOrdered   ?? 0), 0)
@@ -842,7 +733,6 @@ export default function ContractDetailPage() {
   return (
     <div className="space-y-6 w-full">
 
-      {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <Link href="/contracts" className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] mb-3 transition-colors">
@@ -860,6 +750,7 @@ export default function ContractDetailPage() {
           </div>
           <p className="text-[var(--text-muted)] text-sm mt-1">{contract.Representative || 'No representative'}</p>
         </div>
+
         {expiryStatus !== 'expired' && (
         <div className="flex items-center gap-2">
           <button
@@ -945,12 +836,6 @@ export default function ContractDetailPage() {
           </h2>
           {expiryStatus !== 'expired' && (
           <div className="flex gap-2">
-            <button
-              onClick={() => { setDetailForm({ ...defaultDetailForm }); setDetailModal(true) }}
-              className="btn-secondary text-xs"
-            >
-              <ClipboardList size={13} /> Add Detail
-            </button>
             <button onClick={() => setPkgModal(true)} className="btn-primary text-xs">
               <Plus size={13} /> Add Package
             </button>
@@ -977,12 +862,10 @@ export default function ContractDetailPage() {
 
                 {/* Package accordion header */}
                 <div className="flex items-center w-full">
-                  <button
-                    onClick={() => setExpandedPkg(
-                      expandedPkg === pkg.FuelContractPackageId ? null : pkg.FuelContractPackageId
-                    )}
-                    className="flex-1 flex items-center justify-between p-4 hover:bg-[var(--bg-tertiary)] transition-colors text-left min-w-0"
-                  >
+                  <Link
+                    className='flex-1 flex items-center justify-between p-4 hover:bg-[var(--bg-tertiary)] transition-colors text-left min-w-0'
+                      href={`/contracts/${pkg.FuelContractID}/packages/${pkg.FuelContractPackageId}`}
+                    >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-8 h-8 rounded-lg bg-brand-500/10 flex items-center justify-center flex-shrink-0">
                         <Package size={14} className="text-brand-500" />
@@ -994,15 +877,40 @@ export default function ContractDetailPage() {
                         </p>
                       </div>
                     </div>
-                    {expandedPkg === pkg.FuelContractPackageId
-                      ? <ChevronDown size={16} className="text-[var(--text-muted)] flex-shrink-0 ml-2" />
-                      : <ChevronRight size={16} className="text-[var(--text-muted)] flex-shrink-0 ml-2" />
-                    }
-                  </button>
-
+                    <ChevronRight size={16} className="text-[var(--text-muted)] flex-shrink-0 ml-2" />
+                  </Link>
                   {/* Action buttons */}
                   <div className="flex items-center gap-2 mx-3 flex-shrink-0">
-                    {/* Certify button — only shown when not yet certified */}
+                    {!pkg.isCertified && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setEditFormPackage({
+                              FuelContractPackageId: pkg.FuelContractPackageId,
+                              PackageName: pkg.PackageName || '',
+                            });
+                            setEditModalPackage(true);
+                          }}
+                          disabled={savingEditPackage === pkg.FuelContractPackageId}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 active:scale-95 text-white text-xs font-500 transition-all whitespace-nowrap shadow-sm disabled:opacity-60 disabled:cursor-wait"
+                          title={pkg.isCertified ? "Cannot Modify Certified Package" : "Modify Package"}
+                        >
+                          <Pen size={13} />
+                          {savingEditPackage === pkg.FuelContractPackageId ? 'Saving…' : 'Edit'}
+                        </button>
+
+                        <button
+                          onClick={() => setDeleteConfirmPkg(pkg)}
+                          disabled={savingReport === pkg.FuelContractPackageId}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 active:scale-95 text-white text-xs font-500 transition-all whitespace-nowrap shadow-sm disabled:opacity-60 disabled:cursor-wait"
+                          title={pkg.isCertified ? "Cannot Delete Certified Package" : "Delete Package"}
+                        >
+                          <Trash2 size={13} />
+                          {savingReport === pkg.FuelContractPackageId ? 'Deleting..' : 'Delete'}
+                        </button>
+                      </>
+                    )}
+
                     {expiryStatus !== 'expired' && (
                     !pkg.isCertified ? (
                       <button
@@ -1031,113 +939,6 @@ export default function ContractDetailPage() {
                     </button>
                   </div>
                 </div>
-
-                {/* Expanded details */}
-                {expandedPkg === pkg.FuelContractPackageId && (
-                  <div className="border-t border-[var(--border)]">
-
-                    {/* Sub-toolbar */}
-                    <div className="px-4 py-2 bg-[var(--bg-tertiary)] flex items-center justify-between">
-                      <span className="text-xs text-[var(--text-muted)]">Contract Details</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleGenerateReport(pkg)}
-                          disabled={savingReport === pkg.FuelContractPackageId}
-                          className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 transition-colors flex items-center gap-1 px-2 py-1 rounded-md border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 disabled:opacity-50"
-                        >
-                          <FileBarChart2 size={12} /> Generate Report
-                        </button>
-                        {!pkg.isCertified && expiryStatus !== 'expired' && (
-                          <button
-                            onClick={() => {
-                              setDetailForm({ ...defaultDetailForm, FuelContractPackageId: String(pkg.FuelContractPackageId) })
-                              setDetailModal(true)
-                            }}
-                            className="text-xs text-brand-500 hover:text-brand-400 transition-colors flex items-center gap-1"
-                          >
-                            <Plus size={12} /> Add Detail
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {!pkg.details || pkg.details.length === 0 ? (
-                      <div className="p-6 text-center text-sm text-[var(--text-muted)]">
-                        No details added to this package yet.
-                      </div>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="data-table">
-                          <thead>
-                            <tr>
-                              <th>Type</th>
-                              <th>Plant</th>
-                              <th>Fuel Type</th>
-                              <th>Functional Group</th>
-                              <th>Location</th>
-                              <th>Delivery Date</th>
-                              <th>Vol. Ordered</th>
-                              <th>Vol. Validated</th>
-                              <th>Price / L</th>
-                              <th>Invoice No.</th>
-                              <th>Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {pkg.details.map((d: any) => (
-                              <tr key={d.FuelContractDetailID}>
-                                <td>
-                                  <span className={`badge text-xs ${getContractTypeColor(d.ContractType)}`}>
-                                    {d.ContractType || 'ORIGINAL'}
-                                  </span>
-                                </td>
-                                <td className="text-xs text-[var(--text-secondary)] whitespace-nowrap">
-                                  {d.PlantName || plantLabel(d.PlantID)}
-                                </td>
-                                <td className="text-xs text-[var(--text-secondary)] whitespace-nowrap">
-                                  {fuelLabel(d.FuelTypeID)}
-                                </td>
-                                <td className="text-xs text-[var(--text-secondary)]">{d.FunctionalGroup || '—'}</td>
-                                <td className="text-xs text-[var(--text-secondary)]">{d.LocationGroup || '—'}</td>
-                                <td className="text-xs text-[var(--text-secondary)] whitespace-nowrap">{formatDate(d.DeliveryDate)}</td>
-                                <td className="text-xs text-right font-mono">{formatNumber(d.VolumeOrdered)}</td>
-                                <td className="text-xs text-right font-mono">{formatNumber(d.VolumeValidated)}</td>
-                                <td className="text-xs text-right font-mono">{formatCurrency(d.ContractPrice)}</td>
-                                <td className="text-xs text-[var(--text-secondary)]">{d.InvoiceNo || '—'}</td>
-                                <td>
-                                  <div className="flex items-center gap-1">
-                                    {pkg.isCertified || expiryStatus === 'expired' ? (
-                                      <span className="text-xs text-[var(--text-muted)] px-1.5 flex items-center gap-1">
-                                        <Lock size={11} /> Locked
-                                      </span>
-                                    ) : (
-                                      <>
-                                    <button
-                                      onClick={() => openEditDetail(d)}
-                                      className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-brand-500 transition-colors"
-                                      title="Edit"
-                                    >
-                                      <Edit2 size={13} />
-                                    </button>
-                                    <button
-                                      onClick={() => openDeleteDetail(d)}
-                                      className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-[var(--text-muted)] hover:text-red-500 transition-colors"
-                                      title="Delete"
-                                    >
-                                      <Trash2 size={13} />
-                                    </button>
-                                      </>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -1259,57 +1060,23 @@ export default function ContractDetailPage() {
         </form>
       </Modal>
 
-      {/* Add Detail */}
-      <Modal open={detailModal} onClose={() => setDetailModal(false)} title="Add Contract Detail" size="xl">
-        <form onSubmit={handleAddDetail} className="space-y-2">
-          <DetailFormFields form={detailForm} onChange={setDetailForm} packages={contract?.packages || []} fuelTypes={fuelTypes} plants={plants} packageSummaries={packageSummaries} />
-          <div className="flex justify-end gap-2 pt-4">
-            <button type="button" className="btn-secondary" onClick={() => setDetailModal(false)}>Cancel</button>
-            <button type="submit" className="btn-primary" disabled={savingDetail}>
-              {savingDetail ? 'Adding…' : <><Plus size={14} /> Add Detail</>}
+      {/* Edit Package */}
+      <Modal open={editModalPackage} onClose={() => setEditModalPackage(false)} title="Edit Package">
+          <form onSubmit={handleEditPackage} className="space-y-4">
+          <InputField
+              label="Package Name"
+              value={editFormPackage.PackageName}
+              onChange={(v) => setEditFormPackage( ({ PackageName: v, FuelContractPackageId: editFormPackage.FuelContractPackageId }) )}
+              required
+            />
+          <div className="flex justify-end gap-2">
+            <button type="button" className="btn-secondary" onClick={() => setEditModalPackage(false)}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={savingEditPackage}>
+              {savingEditPackage ? 'Updating…' : <><Pencil size={14} /> Save Package</>}
             </button>
           </div>
         </form>
       </Modal>
-
-      {/* Edit Detail */}
-      <Modal open={editDetailModal} onClose={() => setEditDetailModal(false)} title="Edit Contract Detail" size="xl">
-        <form onSubmit={handleEditDetail} className="space-y-2">
-          {/* Context strip */}
-          <div className="flex items-center gap-2 pb-3 border-b border-[var(--border)]">
-            <span className="text-xs text-[var(--text-muted)]">Editing:</span>
-            <span className={`badge text-xs ${getContractTypeColor(editDetailForm.ContractType)}`}>
-              {editDetailForm.ContractType || 'ORIGINAL'}
-            </span>
-            {editDetailForm.InvoiceNo && (
-              <span className="text-xs font-mono bg-[var(--bg-tertiary)] px-2 py-0.5 rounded text-[var(--text-secondary)]">
-                {editDetailForm.InvoiceNo}
-              </span>
-            )}
-            {editDetailForm.PlantName && (
-              <span className="text-xs text-[var(--text-muted)]">· {editDetailForm.PlantName}</span>
-            )}
-          </div>
-          <DetailFormFields form={editDetailForm} onChange={setEditDetailForm} packages={contract?.packages || []} fuelTypes={fuelTypes} plants={plants} packageSummaries={packageSummaries} />
-          <div className="flex justify-end gap-2 pt-4">
-            <button type="button" className="btn-secondary" onClick={() => setEditDetailModal(false)}>Cancel</button>
-            <button type="submit" className="btn-primary" disabled={savingEditDetail}>
-              {savingEditDetail ? 'Saving…' : <><Edit2 size={14} /> Save Changes</>}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Delete Detail */}
-      <ConfirmDialog
-        open={deleteDetailConfirm}
-        onClose={() => setDeleteDetailConfirm(false)}
-        onConfirm={handleDeleteDetail}
-        title="Delete Contract Detail"
-        description={`Are you sure you want to delete "${deleteDetailName}"? This cannot be undone.`}
-        confirmLabel="Delete Detail"
-        danger
-      />
 
       {/* Document View Modal */}
       <Modal open={docViewModal} onClose={() => { setDocViewModal(false); setDocViewData(null) }} title={docViewData?.FileName || 'Document'} size="xl">
@@ -1363,6 +1130,18 @@ export default function ContractDetailPage() {
         description={`Certifying this package will:\n\n• Lock all existing details (no edits or deletions)\n• Prevent any new details from being added\n• Save the running balance summary on the next report generation\n\nThis action cannot be undone. Are you sure you want to certify "${certifyConfirmPkg?.PackageName ?? ''}"?`}
         confirmLabel="Certify Package"
       />
+
+
+      {/* Delete Package confirm */}
+      <ConfirmDialog
+        open={!!deleteConfirmPkg}
+        onClose={() => setDeleteConfirmPkg(null)}
+        onConfirm={handleDeletePackageConfirm}
+        title={`Delete Package — ${deleteConfirmPkg?.PackageName ?? ''}`}
+        description={`Deleting this package will:\n\n• Remove all associated details\n• This action cannot be undone. Are you sure you want to delete "${deleteConfirmPkg?.PackageName ?? ''}"?`}
+        confirmLabel="Delete Package"
+      />
+
 
       {/* Edit Contract */}
       <Modal open={editModal} onClose={() => setEditModal(false)} title="Edit Contract" size="lg">
