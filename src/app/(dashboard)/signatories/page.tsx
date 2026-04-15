@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { Plus, RefreshCw, Edit2, Trash2, Users2 } from 'lucide-react'
-import { SectionHeader, Modal, InputField, EmptyState } from '@/components/ui/index'
+import { SectionHeader, Modal, InputField, EmptyState,ConfirmDialog } from '@/components/ui/index'
 import { useToast } from '@/components/ui/Toast'
 import { formatDate } from '@/lib/utils'
 import Link from 'next/link'
@@ -39,6 +39,9 @@ export default function SignatoriesPage() {
   const [editId,      setEditId]      = useState<number | null>(null)
   const [form,        setForm]        = useState(defaultForm)
   const [saving,      setSaving]      = useState(false)
+
+  const [deleteConfirm,   setDeleteConfirm]   = useState(false)
+  const [deleteTargetId,  setDeleteTargetId]  = useState<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -100,11 +103,17 @@ export default function SignatoriesPage() {
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Delete this signatory record?')) return
-    const res = await fetch(`/api/signatories/${id}`, { method: 'DELETE' })
-    if (res.ok) { success('Deleted'); load() }
-    else toastError('Failed to delete')
+  const handleDelete = async () => {
+    if (!deleteTargetId) return
+    const res = await fetch(`/api/signatories/${deleteTargetId}`, { method: 'DELETE' })
+    if (res.ok) {
+      success('Signatory deleted')
+      setDeleteConfirm(false)
+      setDeleteTargetId(null)
+      load()
+    } else {
+      toastError('Failed to delete')
+    }
   }
 
   const contractLabel = (id: number | null) => {
@@ -177,7 +186,12 @@ export default function SignatoriesPage() {
                     <td>
                       <div className="flex items-center gap-1">
                         <button onClick={() => openEdit(s)} className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-brand-500 transition-colors"><Edit2 size={13} /></button>
-                        <button onClick={() => handleDelete(s.SignatoryID)} className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-[var(--text-muted)] hover:text-red-500 transition-colors"><Trash2 size={13} /></button>
+                        <button
+                          onClick={() => { setDeleteTargetId(s.SignatoryID); setDeleteConfirm(true) }}
+                          className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-[var(--text-muted)] hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -251,6 +265,18 @@ export default function SignatoriesPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Delete Signatories */}
+      <ConfirmDialog
+        open={deleteConfirm}
+        onClose={() => { setDeleteConfirm(false); setDeleteTargetId(null) }}
+        onConfirm={handleDelete}
+        title="Delete Signatories"
+        description="Are you sure you want to delete this signatory record? This cannot be undone."
+        confirmLabel="Delete Signatories"
+        danger
+      />
+
     </div>
   )
 }
