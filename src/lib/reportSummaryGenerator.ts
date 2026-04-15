@@ -238,11 +238,11 @@ export function generateContractSummaryReport(
                 <th>Beg. Balance</th>
                 <th>End Balance</th>
                 <th>Consumed</th>
-                <th>% Used</th>
+                <th>% Utilized</th>
                 <th>Beg. Volume</th>
                 <th>End Volume</th>
                 <th>Consumed</th>
-                <th>% Used</th>
+                <th>% Utilized</th>
                 <th>Vol. Ordered</th>
                 <th>Vol. Validated</th>
                 <th>Amt. Ordered</th>
