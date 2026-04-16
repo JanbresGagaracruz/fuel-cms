@@ -457,6 +457,7 @@ export default function ContractDetailPage() {
     if (res.ok) {
       success('Package updated', editFormPackage.PackageName)
       setEditFormPackage(defaultPkgForm)
+      setEditModalPackage(false)
       load()
     } else {
       toastError('Failed to update package')
@@ -1064,19 +1065,38 @@ export default function ContractDetailPage() {
       <Modal open={editModalPackage} onClose={() => setEditModalPackage(false)} title="Edit Package">
           <form onSubmit={handleEditPackage} className="space-y-4">
           <InputField
-              label="Package Name"
-              value={editFormPackage.PackageName}
-              onChange={(v) => setEditFormPackage( ({ PackageName: v, FuelContractPackageId: editFormPackage.FuelContractPackageId }) )}
-              required
-            />
+          label="Package Name"
+          value={editFormPackage.PackageName}
+          onChange={(v) => setEditFormPackage( ({ PackageName: v, FuelContractPackageId: editFormPackage.FuelContractPackageId }) )}
+          required
+        />
           <div className="flex justify-end gap-2">
-            <button type="button" className="btn-secondary" onClick={() => setEditModalPackage(false)}>Cancel</button>
-            <button type="submit" className="btn-primary" disabled={savingEditPackage}>
-              {savingEditPackage ? 'Updating…' : <><Pencil size={14} /> Save Package</>}
-            </button>
+        <button type="button" className="btn-secondary" onClick={() => setEditModalPackage(false)}>Cancel</button>
+        <button type="submit" className="btn-primary" disabled={savingEditPackage}>
+          {savingEditPackage ? 'Updating…' : <><Pencil size={14} /> Save Package</>}
+        </button>
           </div>
         </form>
       </Modal>
+
+      {editModalPackage && (
+        <Modal open={editModalPackage} onClose={() => setEditModalPackage(false)} title="Edit Package">
+          <form onSubmit={handleEditPackage} className="space-y-4">
+        <InputField
+          label="Package Name"
+          value={editFormPackage.PackageName}
+          onChange={(v) => setEditFormPackage({ PackageName: v, FuelContractPackageId: editFormPackage.FuelContractPackageId })}
+          required
+        />
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn-secondary" onClick={() => setEditModalPackage(false)}>Cancel</button>
+          <button type="submit" className="btn-primary" disabled={savingEditPackage}>
+            {savingEditPackage ? 'Updating…' : <><Pencil size={14} /> Update Package</>}
+          </button>
+        </div>
+          </form>
+        </Modal>
+      )}
 
       {/* Document View Modal */}
       <Modal open={docViewModal} onClose={() => { setDocViewModal(false); setDocViewData(null) }} title={docViewData?.FileName || 'Document'} size="xl">
