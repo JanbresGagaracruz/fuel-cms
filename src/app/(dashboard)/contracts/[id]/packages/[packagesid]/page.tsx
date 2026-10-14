@@ -482,7 +482,7 @@ export default function PackageDetailsPage() {
       // Prefer contract-specific, fall back to first available
       signatories = Array.isArray(sigData) && sigData.length > 0 ? sigData[0] : null
 
-      console.log('Fetched signatories:', contract.FuelContractID)
+      // console.log('Fetched signatories:', contract.FuelContractID)
     } catch { toastError('Something went wrong fetching signatories.') }
 
     const contractArg = {
