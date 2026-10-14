@@ -16,12 +16,11 @@ import {
 } from '@/components/ui/index'
 import { useToast } from '@/components/ui/Toast'
 import {
-  formatDate, formatCurrency, formatNumber, getExpiryStatus, getContractTypeColor,
+  formatDate, formatCurrency, formatNumber, getExpiryStatus, 
 } from '@/lib/utils'
 import { generatePackageReport, generateReportRows, generatePackageSummary } from '@/lib/reportGenerator'
 import { generateContractSummaryReport } from '@/lib/reportSummaryGenerator'
 import {  canCreate, canDelete } from '@/lib/permissions'
-import { set } from 'date-fns'
 
 // ─── constants ───────────────────────────────────────────────────────────────
 
@@ -30,8 +29,6 @@ const CONTRACT_TYPES = [
   { label: 'Amendment', value: 'AMENDMENT' },
   { label: 'Running',   value: 'RUNNING'   },
   { label: 'Closing',   value: 'CLOSING'   },
-  // { label: 'Renewal',   value: 'RENEWAL'   },
-  // { label: 'Addendum',  value: 'ADDENDUM'  },
 ]
 
 const defaultPkgForm    = { PackageName: '' }
@@ -43,7 +40,6 @@ const defaultDetailForm = {
   InvoiceNo: '', DeliveryDate: '',
   ContractPrice: '', VolumeOrdered: '', VolumeValidated: '',
 }
-type DetailForm = typeof defaultDetailForm
 
 // ─── Divider label inside modal ───────────────────────────────────────────────
 function FieldGroup({ label }: { label: string }) {
@@ -57,266 +53,6 @@ function FieldGroup({ label }: { label: string }) {
   )
 }
 
-// ─── DetailFormFields — OUTSIDE page to prevent remount on keystroke ──────────
-interface DetailFormFieldsProps {
-  form:             DetailForm
-  onChange:         (v: DetailForm) => void
-  packages:         any[]
-  fuelTypes:        any[]
-  plants:           any[]
-  packageSummaries: any[]   // rpt_PackageSummary records for AMENDMENT auto-populate
-}
-
-function DetailFormFields({ form, onChange, packages, fuelTypes, plants, packageSummaries }: DetailFormFieldsProps) {
-  const isAmendment = form.ContractType === 'AMENDMENT'
-  const isClosing = form.ContractType === 'CLOSING'
-
-  // Called when user picks the SOURCE package (Amend From) for an AMENDMENT row
-  const handleAmendSourceSelect = (srcPkgId: string) => {
-    if (!srcPkgId) {
-      onChange({ ...form, amendSourcePackageId: '', ContractPrice: '', VolumeOrdered: '' })
-      return
-    }
-    const summary = packageSummaries.find((s: any) => String(s.FuelContractPackageId) === srcPkgId)
-    if (summary) {
-      onChange({
-        ...form,
-        amendSourcePackageId: srcPkgId,
-        ContractPrice: summary.EndRunningBalance != null ? String(Number(summary.EndRunningBalance).toFixed(4)) : '',
-        VolumeOrdered: summary.EndVolumeBalance  != null ? String(Number(summary.EndVolumeBalance).toFixed(4))  : '',
-      })
-    } else {
-      // Package exists but no summary yet — still set source, just blank the price/volume
-      onChange({ ...form, amendSourcePackageId: srcPkgId, ContractPrice: '', VolumeOrdered: '' })
-    }
-  }
-
-  // CLOSING type — only show Est. Price + Volume Validated
-  if (isClosing) {
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-        <FieldGroup label="Classification" />
-        <SelectField
-          label="Contract Type *"
-          value={form.ContractType}
-          onChange={(v) => onChange({ ...form, ContractType: v })}
-          options={CONTRACT_TYPES}
-          required
-        />
-        <SelectField
-          label="Package"
-          value={form.FuelContractPackageId}
-          onChange={(v) => onChange({ ...form, FuelContractPackageId: v })}
-          options={[
-            { label: '— No Package —', value: '' },
-            ...packages
-              .filter((p: any) => !p.isCertified)
-              .map((p: any) => ({
-                label: p.PackageName,
-                value: String(p.FuelContractPackageId),
-              })),
-          ]}
-        />
-        <InputField label="Invoice No." value={form.InvoiceNo} onChange={(v) => onChange({ ...form, InvoiceNo: v })} placeholder="e.g. INV-2025-001" />
-        <div className="col-span-full p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-400">
-          <strong>Closing entry</strong> — only Estimated Price and Validated Volume are required.
-        </div>
-        <FieldGroup label="Closing Values" />
-        <InputField label="Est. Price / Closing Price (₱/L)" value={form.ContractPrice} onChange={(v) => onChange({ ...form, ContractPrice: v })} type="number" placeholder="0.0000" />
-        <InputField label="Volume Validated (L)" value={form.VolumeValidated} onChange={(v) => onChange({ ...form, VolumeValidated: v })} type="number" placeholder="0.00" />
-      </div>
-    )
-  }
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
-
-      {/* ── Group 1: Classification ── */}
-      <FieldGroup label="Classification" />
-
-      <SelectField
-        label="Contract Type *"
-        value={form.ContractType}
-        onChange={(v) => onChange({ ...form, ContractType: v, ContractPrice: '', VolumeOrdered: '', FuelContractPackageId: '', amendSourcePackageId: '' })}
-        options={CONTRACT_TYPES}
-        required
-      />
-
-      {/* ── Destination Package — only uncertified packages ── */}
-      <SelectField
-        label="Package (Destination)"
-        value={form.FuelContractPackageId}
-        onChange={(v) => onChange({ ...form, FuelContractPackageId: v })}
-        options={[
-          { label: '— No Package —', value: '' },
-          ...packages
-            .filter((p: any) => !p.isCertified)
-            .map((p: any) => ({
-              label: p.PackageName,
-              value: String(p.FuelContractPackageId),
-            })),
-        ]}
-      />
-
-      {/* ── Amend From (source package — CROSS-CONTRACT, shows all certified summaries) ── */}
-      {isAmendment && (
-        <div className="col-span-full space-y-1.5">
-          <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
-            Amend From (Source Package) <span className="text-brand-500">*</span>
-          </label>
-          <select
-            value={form.amendSourcePackageId}
-            onChange={(e) => handleAmendSourceSelect(e.target.value)}
-            className="input-field"
-          >
-            <option value="">— Select source package whose balance to amend —</option>
-            {packageSummaries
-              .map((s: any) => {
-                const balLabel = ` | ₱${Number(s.EndRunningBalance).toLocaleString('en-PH', { minimumFractionDigits: 2 })} / ${Number(s.EndVolumeBalance).toLocaleString('en-PH', { minimumFractionDigits: 2 })} L`
-                return (
-                  <option key={s.FuelContractPackageId} value={String(s.FuelContractPackageId)}>
-                    [{s.ContractNo}] {s.PackageName}
-                  </option>
-                )
-              })
-            }
-          </select>
-
-          {/* Info card — only when a source package is selected */}
-          {form.amendSourcePackageId && (() => {
-            const s = packageSummaries.find((x: any) => String(x.FuelContractPackageId) === form.amendSourcePackageId)
-            if (!s) {
-              return (
-                <p className="text-xs text-[var(--text-muted)] mt-1">
-                  No saved summary for this package. Generate its report first to auto-populate balances, or enter values manually.
-                </p>
-              )
-            }
-          })()}
-        </div>
-      )}
-
-      <InputField
-        label="Invoice No."
-        value={form.InvoiceNo}
-        onChange={(v) => onChange({ ...form, InvoiceNo: v })}
-        placeholder="e.g. INV-2025-001"
-      />
-
-      {/* ── Group 2: Location / Plant ── */}
-      <FieldGroup label="Location" />
-
-      <div className="space-y-1.5">
-        <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
-          Plant
-        </label>
-        <select
-          value={form.PlantID}
-          onChange={(e) => {
-            const sel = plants.find((p: any) => String(p.PlantID) === e.target.value)
-            onChange({ ...form, PlantID: e.target.value, PlantName: sel?.PlantName ?? '' })
-          }}
-          className="input-field"
-        >
-          <option value="">— Select plant —</option>
-          {plants.map((p: any) => (
-            <option key={p.PlantID} value={String(p.PlantID)}>
-              {p.PlantName}{p.ElecCoop ? ` (${p.ElecCoop})` : ''}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <InputField
-        label="Functional Group"
-        value={form.FunctionalGroup}
-        onChange={(v) => onChange({ ...form, FunctionalGroup: v })}
-        placeholder="e.g. Operations"
-      />
-      <InputField
-        label="Location Group"
-        value={form.LocationGroup}
-        onChange={(v) => onChange({ ...form, LocationGroup: v })}
-        placeholder="e.g. NCR"
-      />
-
-      {/* ── Group 3: Fuel & Delivery ── */}
-      <FieldGroup label="Fuel & Delivery" />
-
-      <div className="space-y-1.5">
-        <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
-          Fuel Type
-        </label>
-        <select
-          value={form.FuelTypeID}
-          onChange={(e) => onChange({ ...form, FuelTypeID: e.target.value })}
-          className="input-field"
-        >
-          <option value="">— Select fuel type —</option>
-          {fuelTypes.map((f: any) => (
-            <option key={f.FuelTypeID} value={String(f.FuelTypeID)}>
-              {f.Type}{f.Fuel ? ` — ${f.Fuel}` : ''}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <InputField
-        label="Delivery Date"
-        value={form.DeliveryDate}
-        onChange={(v) => onChange({ ...form, DeliveryDate: v })}
-        type="date"
-      />
-
-      {/* Contract Price — read-only when auto-populated via Amendment */}
-      <div className="space-y-1.5">
-        <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
-          Contract Price/Fuel Price  (₱/L)
-        </label>
-        <input
-          type="number"
-          value={form.ContractPrice}
-          onChange={(e) => onChange({ ...form, ContractPrice: e.target.value })}
-          placeholder="0.0000"
-          // readOnly={isAmendment && !!form.amendSourcePackageId}
-          className={`input-field ${isAmendment && form.amendSourcePackageId ? 'bg-amber-50 dark:bg-amber-950/20 ' : ''}`}
-        />
-      </div>
-
-      {/* ── Group 4: Volume ── */}
-      <FieldGroup label="Volume" />
-
-      {/* Volume Ordered — read-only when auto-populated via Amendment */}
-      <div className="space-y-1.5">
-        <label className="text-xs font-500 text-[var(--text-secondary)] uppercase tracking-wide">
-          Volume Ordered (L)
-        </label>
-        <input
-          type="number"
-          value={form.VolumeOrdered}
-          onChange={(e) => onChange({ ...form, VolumeOrdered: e.target.value })}
-          placeholder="0.00"
-          // readOnly={isAmendment && !!form.amendSourcePackageId} cursor-not-allowed
-          className={`input-field ${isAmendment && form.amendSourcePackageId ? 'bg-amber-50 dark:bg-amber-950/20 ' : ''}`}
-        />
-      </div>
-
-      <InputField
-        label="Volume Validated (L)"
-        value={form.VolumeValidated}
-        onChange={(v) => onChange({ ...form, VolumeValidated: v })}
-        type="number"
-        placeholder="0.00"
-      />
-      <InputField
-        label="Plant Name (auto-filled)"
-        value={form.PlantName}
-        onChange={(v) => onChange({ ...form, PlantName: v })}
-        placeholder="From plant selection"
-      />
-    </div>
-  )
-}
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ContractDetailPage() {
@@ -338,8 +74,6 @@ export default function ContractDetailPage() {
   const [docViewData,  setDocViewData]  = useState<any>(null)
 
   // Lookup data
-  const [fuelTypes,        setFuelTypes]        = useState<any[]>([])
-  const [plants,           setPlants]           = useState<any[]>([])
   const [suppliers,        setSuppliers]        = useState<any[]>([])
   const [packageSummaries, setPackageSummaries] = useState<any[]>([])
 
@@ -369,12 +103,8 @@ export default function ContractDetailPage() {
   // ── Lookups ───────────────────────────────────────────────────────────────
   useEffect(() => {
     Promise.all([
-      fetch('/api/fuel-types').then(r => r.json()),
-      fetch('/api/plants').then(r => r.json()),
       fetch('/api/suppliers').then(r => r.json()),
-    ]).then(([ft, pl, sp]) => {
-      setFuelTypes(Array.isArray(ft) ? ft : [])
-      setPlants(Array.isArray(pl) ? pl : [])
+    ]).then(([ sp]) => {
       setSuppliers(Array.isArray(sp) ? sp : [])
     })
   }, [])
@@ -402,10 +132,10 @@ export default function ContractDetailPage() {
   const load = useCallback(async () => {
     setLoading(true)
     const res = await fetch(`/api/contracts/${id}`)
+    console.log('Fetching contract details for ID:', session?.user)
     if (res.ok) {
       const data = await res.json()
       setContract(data)
-      console.log('Loaded contract:', data)
       setEditForm({
         ContractNo:      data.ContractNo      || '',
         SupplierID:      data.supplier.SupplierName     || '',
@@ -514,10 +244,6 @@ export default function ContractDetailPage() {
     } else {
       toastError('Failed to certify package')
     }
-  }
-
-  const handleDeletePackage = (pkg: any) => {
-    setDeleteConfirmPkg(pkg)
   }
 
   const handleDeletePackageConfirm = async () => {
@@ -651,6 +377,7 @@ export default function ContractDetailPage() {
       const rowsData = await rowsRes.json()
 
       const summary = generatePackageSummary(contractArg, pkgArg)
+
       const summaryRes = await fetch('/api/package-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

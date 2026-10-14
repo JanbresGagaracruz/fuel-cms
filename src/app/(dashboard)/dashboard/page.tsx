@@ -115,8 +115,8 @@ export default function DashboardPage() {
               <AreaChart data={monthlyData} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
                 <defs>
                   <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -134,10 +134,10 @@ export default function DashboardPage() {
                   type="monotone"
                   dataKey="count"
                   name="Contracts"
-                  stroke="#f97316"
+                  stroke="#2563eb"
                   strokeWidth={2}
                   fill="url(#colorCount)"
-                  dot={{ r: 3, fill: '#f97316', strokeWidth: 0 }}
+                  dot={{ r: 3, fill: '#2563eb', strokeWidth: 0 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
