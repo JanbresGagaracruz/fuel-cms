@@ -4,9 +4,8 @@ import { useSession, signOut } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import { useTheme } from '@/components/ui/ThemeProvider'
 import {
-  Sun, Moon, Bell, LogOut, Menu, Search, ChevronRight
+  Sun, Moon, LogOut, Menu, ChevronRight, User2, UserCog2, ShieldPlus, UserPen
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { useState } from 'react'
 
 const routeLabels: Record<string, string> = {
@@ -115,9 +114,15 @@ export function Topbar({ onMenuToggle, isSidebarCollapsed }: TopbarProps) {
             className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
           >
             <div className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center">
-              <span className="text-white text-xs font-600">
-                {(session?.user?.name || session?.user?.username || 'U')[0].toUpperCase()}
-              </span>
+              {  session?.user?.accessLevel === 2 ? (
+                <UserPen size={15} className="text-white" />
+              ) : session?.user?.accessLevel === 3 ? (
+                <UserCog2 size={15} className="text-white" />
+              ) : session?.user?.accessLevel === 4 ? (
+                <ShieldPlus size={15} className="text-white" />
+              ) : (
+                <User2 size={15} className="text-white" />
+              )}
             </div>
             <div className="hidden md:block text-left">
               <p className="text-xs font-500 text-[var(--text-primary)] leading-tight">

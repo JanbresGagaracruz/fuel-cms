@@ -193,17 +193,11 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           'border-t border-white/5 p-3 flex items-center gap-2',
           isCollapsed && 'justify-center'
         )}>
-          <div className="w-7 h-7 rounded-full bg-brand-600 flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-xs font-600">
-              {(session.user.name || session.user.username || 'U')[0].toUpperCase()}
-            </span>
-          </div>
           {!isCollapsed && (
             <div className="overflow-hidden">
-              <p className="text-white/80 text-xs font-500 truncate">
-                {session.user.name || session.user.username}
+              <p className="text-white/80 text-xs font-300 truncate">
+                National Power Corporation 
               </p>
-              <p className="text-white/30 text-xs truncate">{roleMap[session.user.accessLevel] || 'Staff'}</p>
             </div>
           )}
         </div>

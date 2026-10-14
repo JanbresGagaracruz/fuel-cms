@@ -12,15 +12,15 @@
   --bg-primary: #f8f7f4;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f1f0ed;
-  --bg-sidebar: #0f1117;
+  --bg-sidebar: #111827;
   --text-primary: #0f1117;
   --text-secondary: #6b7280;
   --text-muted: #9ca3af;
   --border: #e5e3dd;
   --border-strong: #d1cfc8;
-  --accent: #f97316;
-  --accent-hover: #ea6c0a;
-  --accent-subtle: #fff7ed;
+  --accent: #1d4ed8;
+  --accent-hover: #1e40af;
+  --accent-subtle: #eff6ff;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
@@ -33,15 +33,15 @@
   --bg-primary: #0b0d11;
   --bg-secondary: #0f1117;
   --bg-tertiary: #161921;
-  --bg-sidebar: #070909;
+  --bg-sidebar: #0b1120;
   --text-primary: #f1f0ed;
   --text-secondary: #9ca3af;
   --text-muted: #6b7280;
   --border: #1e2028;
   --border-strong: #2a2d38;
-  --accent: #f97316;
-  --accent-hover: #fb923c;
-  --accent-subtle: #1c110a;
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-subtle: #172554;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
@@ -108,7 +108,7 @@ body {
 
 .input-field:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.12);
 }
 
 /* Buttons */
@@ -129,8 +129,7 @@ body {
 
 .btn-primary:hover {
   background-color: var(--accent-hover);
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
-  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.25);
 }
 
 .btn-primary:active {

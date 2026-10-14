@@ -227,6 +227,11 @@ export function generateContractSummaryReport(
           <table>
             <thead>
               <tr>
+                <th colspan="14" style="text-align:left;">
+                  ${now}
+                </th>
+              </tr>
+              <tr>
                 <th rowspan="2">#</th>
                 <th rowspan="2">Package Name</th>
                 <th colspan="4">Running Balance (₱)</th>
